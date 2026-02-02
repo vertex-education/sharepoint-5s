@@ -3,7 +3,7 @@
  * Handles Microsoft OAuth via Supabase Auth, token storage, and session management.
  */
 
-import { supabase, EDGE_FUNCTION_BASE } from './lib/supabase-client.js';
+import { supabase } from './lib/supabase-client.js';
 
 /** Current user state */
 let currentUser = null;
@@ -45,12 +45,25 @@ export async function initAuth() {
     }
   });
 
-  // Get initial session
+  // Get initial session and validate it
   const { data: { session } } = await supabase.auth.getSession();
-  currentSession = session;
-  currentUser = session?.user ?? null;
-  notifyListeners();
 
+  if (session) {
+    // Validate the session is still good by checking with the server
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      // Session is stale/invalid — clear it
+      console.warn('Stale session detected, signing out');
+      await supabase.auth.signOut();
+      currentSession = null;
+      currentUser = null;
+    } else {
+      currentSession = session;
+      currentUser = user;
+    }
+  }
+
+  notifyListeners();
   return currentUser;
 }
 
@@ -60,9 +73,6 @@ export async function initAuth() {
  * @param {string} [redirectPath] - Path to redirect after auth (e.g., '/dashboard.html')
  */
 export async function signIn(redirectPath) {
-  // Store pending URL if provided
-  const pendingUrl = sessionStorage.getItem('pending_sharepoint_url');
-
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'azure',
     options: {
@@ -118,22 +128,16 @@ export function isSignedIn() {
  */
 async function storeProviderToken(session) {
   try {
-    const response = await fetch(`${EDGE_FUNCTION_BASE}/store-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
+    const { error } = await supabase.functions.invoke('store-token', {
+      body: {
         provider_token: session.provider_token,
         provider_refresh_token: session.provider_refresh_token,
-        expires_in: 3600, // Microsoft tokens typically last 1 hour
-      }),
+        expires_in: 3600,
+      },
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      console.error('Failed to store provider token:', err);
+    if (error) {
+      console.error('Failed to store provider token:', error);
     }
   } catch (err) {
     console.error('Error storing provider token:', err);
