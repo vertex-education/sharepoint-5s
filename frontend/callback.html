@@ -55,21 +55,25 @@
       const spinnerEl = document.getElementById('spinner');
 
       try {
-        // Wait for auth state change (PKCE code exchange)
+        // Wait specifically for the SIGNED_IN event from the PKCE code exchange.
+        // provider_token is ONLY available in this event, not from getSession().
+        let providerToken = null;
+        let providerRefreshToken = null;
+
         const session = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Authentication timed out.')), 15000);
 
-          supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' && session) {
+          // Listen for auth state changes — this is where provider_token comes from
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log('Auth event:', event, 'has provider_token:', !!session?.provider_token);
+            if (session?.provider_token) {
+              providerToken = session.provider_token;
+              providerRefreshToken = session.provider_refresh_token;
+            }
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
               clearTimeout(timeout);
               resolve(session);
             }
-          });
-
-          // Also check if session already exists
-          supabase.auth.getSession().then(({ data: { session }, error }) => {
-            if (error) { clearTimeout(timeout); reject(error); }
-            if (session) { clearTimeout(timeout); resolve(session); }
           });
         });
 
@@ -79,19 +83,24 @@
 
         messageEl.textContent = 'Securing tokens...';
 
-        // Store provider tokens server-side using SDK
-        if (session.provider_token) {
+        // Store provider tokens server-side
+        if (providerToken) {
+          console.log('Storing provider token...');
           const { error: storeErr } = await supabase.functions.invoke('store-token', {
             body: {
-              provider_token: session.provider_token,
-              provider_refresh_token: session.provider_refresh_token,
+              provider_token: providerToken,
+              provider_refresh_token: providerRefreshToken,
               expires_in: 3600,
             },
           });
 
           if (storeErr) {
-            console.warn('Token storage failed, continuing anyway:', storeErr);
+            console.warn('Token storage failed:', storeErr);
+          } else {
+            console.log('Provider token stored successfully');
           }
+        } else {
+          console.warn('No provider_token available in session');
         }
 
         messageEl.textContent = 'Redirecting...';
