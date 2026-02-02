@@ -67,7 +67,7 @@ export async function signIn(redirectPath) {
     provider: 'azure',
     options: {
       scopes: 'offline_access Files.ReadWrite.All Sites.Read.All',
-      redirectTo: `${window.location.origin}${redirectPath || '/callback.html'}`,
+      redirectTo: `${window.location.origin}/sharepoint-5s${redirectPath || '/callback.html'}`,
     },
   });
 
