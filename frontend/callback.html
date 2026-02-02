@@ -48,18 +48,30 @@
   </div>
 
   <script type="module">
-    import { supabase, EDGE_FUNCTION_BASE } from './js/lib/supabase-client.js';
+    import { supabase } from './js/lib/supabase-client.js';
 
     async function handleCallback() {
       const messageEl = document.getElementById('message');
       const spinnerEl = document.getElementById('spinner');
 
       try {
-        // Supabase will handle the OAuth code exchange automatically
-        // because we have detectSessionInUrl: true
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Wait for auth state change (PKCE code exchange)
+        const session = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Authentication timed out.')), 15000);
 
-        if (error) throw error;
+          supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+              clearTimeout(timeout);
+              resolve(session);
+            }
+          });
+
+          // Also check if session already exists
+          supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) { clearTimeout(timeout); reject(error); }
+            if (session) { clearTimeout(timeout); resolve(session); }
+          });
+        });
 
         if (!session) {
           throw new Error('No session found after authentication.');
@@ -67,23 +79,18 @@
 
         messageEl.textContent = 'Securing tokens...';
 
-        // Store provider tokens server-side
+        // Store provider tokens server-side using SDK
         if (session.provider_token) {
-          const response = await fetch(`${EDGE_FUNCTION_BASE}/store-token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
+          const { error: storeErr } = await supabase.functions.invoke('store-token', {
+            body: {
               provider_token: session.provider_token,
               provider_refresh_token: session.provider_refresh_token,
               expires_in: 3600,
-            }),
+            },
           });
 
-          if (!response.ok) {
-            console.warn('Token storage failed, continuing anyway');
+          if (storeErr) {
+            console.warn('Token storage failed, continuing anyway:', storeErr);
           }
         }
 

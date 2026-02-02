@@ -3,50 +3,22 @@
  * Wrapper for all Supabase Edge Function calls.
  */
 
-import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-client.js';
+import { supabase } from './lib/supabase-client.js';
 
 /**
  * Make an authenticated request to a Supabase Edge Function.
+ * Uses supabase.functions.invoke() which handles auth headers automatically.
  */
-async function callEdgeFunction(name, { method = 'POST', body = null, params = null } = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
+async function callEdgeFunction(name, { body = null } = {}) {
+  const { data, error } = await supabase.functions.invoke(name, {
+    body: body,
+  });
 
-  if (!session) {
-    throw new Error('Not authenticated. Please sign in first.');
+  if (error) {
+    throw new Error(error.message || `Edge Function "${name}" failed`);
   }
 
-  let url = `${EDGE_FUNCTION_BASE}/${name}`;
-  if (params) {
-    const searchParams = new URLSearchParams(params);
-    url += `?${searchParams.toString()}`;
-  }
-
-  const headers = {
-    'Authorization': `Bearer ${session.access_token}`,
-    'apikey': SUPABASE_KEY,
-  };
-
-  const options = { method, headers };
-
-  if (body) {
-    headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(url, options);
-
-  if (!response.ok) {
-    let errorMessage;
-    try {
-      const err = await response.json();
-      errorMessage = err.error || err.message || `HTTP ${response.status}`;
-    } catch {
-      errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-    }
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
+  return data;
 }
 
 /**
@@ -67,8 +39,7 @@ export async function startCrawl(sharepointUrl) {
  */
 export async function getCrawlStatus(scanId) {
   return callEdgeFunction('crawl-status', {
-    method: 'GET',
-    params: { scan_id: scanId },
+    body: { scan_id: scanId },
   });
 }
 

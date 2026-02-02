@@ -14,8 +14,16 @@ serve(async (req: Request) => {
 
   try {
     const { userId } = await verifyAuth(req);
-    const url = new URL(req.url);
-    const scanId = url.searchParams.get('scan_id');
+
+    // Accept scan_id from body (POST) or query params (GET)
+    let scanId: string | null = null;
+    if (req.method === 'POST') {
+      const body = await req.json();
+      scanId = body.scan_id;
+    } else {
+      const url = new URL(req.url);
+      scanId = url.searchParams.get('scan_id');
+    }
 
     if (!scanId) {
       return new Response(
