@@ -15,7 +15,15 @@ async function callEdgeFunction(name, { body = null } = {}) {
   });
 
   if (error) {
-    throw new Error(error.message || `Edge Function "${name}" failed`);
+    // Extract the actual error from the Edge Function response
+    let message = error.message;
+    try {
+      if (error.context && typeof error.context.json === 'function') {
+        const body = await error.context.json();
+        message = body.error || body.message || message;
+      }
+    } catch {}
+    throw new Error(message);
   }
 
   return data;
