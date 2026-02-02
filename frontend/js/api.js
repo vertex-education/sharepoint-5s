@@ -3,30 +3,48 @@
  * Wrapper for all Supabase Edge Function calls.
  */
 
-import { supabase } from './lib/supabase-client.js';
+import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-client.js';
 
 /**
  * Make an authenticated request to a Supabase Edge Function.
- * Uses supabase.functions.invoke() which handles auth headers automatically.
  */
 async function callEdgeFunction(name, { body = null } = {}) {
-  const { data, error } = await supabase.functions.invoke(name, {
-    body: body,
-  });
-
-  if (error) {
-    // Extract the actual error from the Edge Function response
-    let message = error.message;
-    try {
-      if (error.context && typeof error.context.json === 'function') {
-        const body = await error.context.json();
-        message = body.error || body.message || message;
-      }
-    } catch {}
-    throw new Error(message);
+  // Get fresh session token
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('Not authenticated. Please sign in first.');
   }
 
-  return data;
+  const url = `${EDGE_FUNCTION_BASE}/${name}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`,
+    'apikey': SUPABASE_KEY,
+  };
+
+  console.log(`[API] Calling ${name}...`);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await response.text();
+  console.log(`[API] ${name} response: ${response.status}`, text.substring(0, 200));
+
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    throw new Error(`${name} returned invalid JSON: ${text.substring(0, 100)}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(result.error || result.message || `${name} failed with ${response.status}`);
+  }
+
+  return result;
 }
 
 /**
