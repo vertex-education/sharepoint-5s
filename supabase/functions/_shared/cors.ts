@@ -8,7 +8,7 @@
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',          // Local dev
   'http://127.0.0.1:3000',         // Local dev alt
-  'https://codyvertex.github.io',    // GitHub Pages
+  'https://vertex-education.github.io',  // GitHub Pages (org)
 ];
 
 export function corsHeaders(req: Request): Record<string, string> {
