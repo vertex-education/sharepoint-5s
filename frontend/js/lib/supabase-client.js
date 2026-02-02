@@ -20,4 +20,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
+export const SUPABASE_KEY = SUPABASE_ANON_KEY;
 export const EDGE_FUNCTION_BASE = `${SUPABASE_URL}/functions/v1`;

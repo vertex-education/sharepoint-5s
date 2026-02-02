@@ -3,7 +3,7 @@
  * Wrapper for all Supabase Edge Function calls.
  */
 
-import { supabase, EDGE_FUNCTION_BASE } from './lib/supabase-client.js';
+import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-client.js';
 
 /**
  * Make an authenticated request to a Supabase Edge Function.
@@ -23,6 +23,7 @@ async function callEdgeFunction(name, { method = 'POST', body = null, params = n
 
   const headers = {
     'Authorization': `Bearer ${session.access_token}`,
+    'apikey': SUPABASE_KEY,
   };
 
   const options = { method, headers };
