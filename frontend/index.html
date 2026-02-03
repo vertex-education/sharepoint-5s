@@ -119,22 +119,38 @@
       const url = urlInput.value.trim();
       if (!validateUrl(url).valid) return;
 
+      console.log('[GO] handleGo called, isSignedIn:', isSignedIn());
+
       if (!isSignedIn()) {
         // Save URL and redirect to sign in
         sessionStorage.setItem('pending_sharepoint_url', url);
+        console.log('[GO] Not signed in, redirecting to sign in...');
         await signIn('/callback.html');
         return;
       }
 
       // Signed in — start crawl
       goBtn.disabled = true;
-      goBtn.textContent = '...';
+      goBtn.textContent = 'SCANNING...';
+      inputError.style.display = 'none';
+      console.log('[GO] Starting crawl for:', url);
 
       try {
-        const { scan_id } = await startCrawl(url);
-        window.location.href = `dashboard.html?scan_id=${scan_id}`;
+        const result = await startCrawl(url);
+        console.log('[GO] Crawl started, result:', result);
+        if (result.scan_id) {
+          goBtn.textContent = 'REDIRECTING...';
+          window.location.href = `dashboard.html?scan_id=${result.scan_id}`;
+        } else {
+          throw new Error('No scan_id returned: ' + JSON.stringify(result));
+        }
       } catch (err) {
+        console.error('[GO] Error:', err);
         showToast(err.message, 'error');
+        // Also show inline error for visibility
+        inputError.textContent = err.message;
+        inputError.style.display = 'block';
+        inputHint.style.display = 'none';
         goBtn.disabled = false;
         goBtn.textContent = 'GO';
       }
