@@ -94,37 +94,28 @@
         // Refresh the session to ensure we have a valid JWT
         console.log('[Callback] Refreshing session for fresh JWT...');
         const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-        const freshAccessToken = refreshed?.session?.access_token || session.access_token;
         if (refreshErr) {
-          console.warn('[Callback] Session refresh failed, using original token:', refreshErr.message);
+          console.warn('[Callback] Session refresh failed:', refreshErr.message);
         } else {
-          console.log('[Callback] Session refreshed successfully');
+          console.log('[Callback] Session refreshed. Token starts with:', refreshed?.session?.access_token?.substring(0, 20));
         }
 
-        // Store provider tokens server-side using raw fetch
+        // Store provider tokens using invoke() — it uses the client's internal session
+        // which is now refreshed and valid
         if (providerToken) {
-          console.log('[Callback] Storing provider token via raw fetch...');
-          const storeUrl = `${EDGE_FUNCTION_BASE}/store-token`;
-          const storeResponse = await fetch(storeUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${freshAccessToken}`,
-              'apikey': SUPABASE_KEY,
-            },
-            body: JSON.stringify({
+          console.log('[Callback] Storing provider token via invoke()...');
+          const { data: storeData, error: storeErr } = await supabase.functions.invoke('store-token', {
+            body: {
               provider_token: providerToken,
               provider_refresh_token: providerRefreshToken,
               expires_in: 3600,
-            }),
+            },
           });
 
-          const storeText = await storeResponse.text();
-          console.log('[Callback] store-token response:', storeResponse.status, storeText);
+          console.log('[Callback] store-token result:', storeData, 'error:', storeErr);
 
-          if (!storeResponse.ok) {
-            console.error('[Callback] Token storage failed:', storeResponse.status, storeText);
-            // Show warning but don't block — user can still use the app
+          if (storeErr) {
+            console.error('[Callback] Token storage failed:', storeErr);
             messageEl.textContent = 'Warning: Token storage issue. Redirecting...';
             await new Promise(r => setTimeout(r, 1500));
           } else {
