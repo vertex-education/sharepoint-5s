@@ -91,17 +91,7 @@
         console.log('[Callback] Session obtained. User:', session.user?.email);
         messageEl.textContent = 'Securing tokens...';
 
-        // Refresh the session to ensure we have a valid JWT
-        console.log('[Callback] Refreshing session for fresh JWT...');
-        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-        if (refreshErr) {
-          console.warn('[Callback] Session refresh failed:', refreshErr.message);
-        } else {
-          console.log('[Callback] Session refreshed. Token starts with:', refreshed?.session?.access_token?.substring(0, 20));
-        }
-
-        // Store provider tokens using invoke() — it uses the client's internal session
-        // which is now refreshed and valid
+        // Store provider tokens using invoke() — uses the client's internal session
         if (providerToken) {
           console.log('[Callback] Storing provider token via invoke()...');
           const { data: storeData, error: storeErr } = await supabase.functions.invoke('store-token', {

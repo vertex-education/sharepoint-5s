@@ -37,37 +37,20 @@ export async function initAuth() {
 
   let resolved = false;
 
-  // Use onAuthStateChange as the sole session source (avoids getSession() deadlock)
+  // Use onAuthStateChange as the sole session source (avoids getSession() deadlock).
+  // IMPORTANT: The callback must NOT be async — calling refreshSession() or other
+  // async Supabase auth methods inside onAuthStateChange causes a deadlock because
+  // the client waits for the callback to return before emitting the next event.
   return new Promise((resolve) => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] Event:', event, 'has session:', !!session);
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Event:', event, 'has session:', !!session, 'user:', session?.user?.email);
 
       currentSession = session;
       currentUser = session?.user ?? null;
 
-      // On first load with a session, refresh the JWT to ensure it's valid
-      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session && !resolved) {
-        try {
-          console.log('[Auth] Refreshing session to get fresh JWT...');
-          const { data, error } = await supabase.auth.refreshSession();
-          if (error || !data.session) {
-            console.warn('[Auth] Session refresh failed, signing out:', error?.message);
-            await supabase.auth.signOut();
-            currentSession = null;
-            currentUser = null;
-          } else {
-            currentSession = data.session;
-            currentUser = data.session.user;
-            console.log('[Auth] Session refreshed, user:', currentUser?.email);
-          }
-        } catch (err) {
-          console.error('[Auth] Session refresh error:', err);
-        }
-      }
-
-      // After sign-in, store provider tokens server-side
+      // Store provider tokens server-side (fire-and-forget, not awaited)
       if (event === 'SIGNED_IN' && session?.provider_token) {
-        await storeProviderToken(session);
+        storeProviderToken(session);
       }
 
       notifyListeners();
