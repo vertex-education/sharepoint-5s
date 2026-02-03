@@ -94,52 +94,67 @@ async function performCrawl(
       throw new Error('No document libraries found on this site.');
     }
 
-    // Use the first drive, or try to match the library path
-    let targetDrive = drives[0];
+    // Determine which drives to crawl
+    let targetDrives: any[] = [];
+
     if (libraryPath) {
+      // Specific library requested — find the matching drive
       const decodedLibrary = decodeURIComponent(libraryPath).replace(/^\//, '');
       const match = drives.find((d: any) =>
         d.name.toLowerCase() === decodedLibrary.split('/')[0].toLowerCase()
       );
-      if (match) targetDrive = match;
+      targetDrives = [match || drives[0]];
+    } else {
+      // No specific library — crawl ALL drives on the site
+      targetDrives = drives;
     }
 
-    await admin.from('scans').update({ drive_id: targetDrive.id }).eq('id', scanId);
+    console.log(`Crawling ${targetDrives.length} drive(s):`, targetDrives.map((d: any) => d.name).join(', '));
 
-    // 3. BFS crawl of the drive
+    // Store the first drive ID for reference
+    await admin.from('scans').update({ drive_id: targetDrives[0].id }).eq('id', scanId);
+
+    // 3. BFS crawl of all target drives
     let totalFiles = 0;
     let totalFolders = 0;
     let totalSize = 0;
     let processedFolders = 0;
 
-    // Start from root or from a subfolder if library path specifies one
-    let startPath = `/drives/${targetDrive.id}/root`;
-    if (libraryPath) {
-      const parts = decodeURIComponent(libraryPath).split('/').filter(Boolean);
-      if (parts.length > 1) {
-        // Skip the library name (first part), navigate into subfolders
-        const subPath = parts.slice(1).join('/');
-        startPath = `/drives/${targetDrive.id}/root:/${subPath}:`;
-      }
-    }
-
     // Queue of folder paths to crawl
     interface QueueItem {
+      driveId: string;
       graphPath: string;
       parentItemId: string | null;
       depth: number;
       folderPath: string;
     }
 
-    const queue: QueueItem[] = [{
-      graphPath: `${startPath}/children`,
-      parentItemId: null,
-      depth: 0,
-      folderPath: '/',
-    }];
+    const queue: QueueItem[] = [];
 
-    // Estimate total folders for progress (start with 1, update as we discover more)
-    let estimatedTotalFolders = 1;
+    // Seed the queue with root of each target drive
+    for (const drive of targetDrives) {
+      let startPath = `/drives/${drive.id}/root`;
+
+      // If a specific subfolder was requested (only for single-drive mode)
+      if (libraryPath && targetDrives.length === 1) {
+        const parts = decodeURIComponent(libraryPath).split('/').filter(Boolean);
+        if (parts.length > 1) {
+          const subPath = parts.slice(1).join('/');
+          startPath = `/drives/${drive.id}/root:/${subPath}:`;
+        }
+      }
+
+      queue.push({
+        driveId: drive.id,
+        graphPath: `${startPath}/children`,
+        parentItemId: null,
+        depth: 0,
+        folderPath: `/${drive.name}/`,
+      });
+    }
+
+    // Estimate total folders for progress
+    let estimatedTotalFolders = targetDrives.length;
 
     while (queue.length > 0) {
       const current = queue.shift()!;
@@ -175,7 +190,8 @@ async function performCrawl(
               totalFolders++;
               estimatedTotalFolders++;
               queue.push({
-                graphPath: `/drives/${targetDrive.id}/items/${item.id}/children`,
+                driveId: current.driveId,
+                graphPath: `/drives/${current.driveId}/items/${item.id}/children`,
                 parentItemId: item.id,
                 depth: current.depth + 1,
                 folderPath: itemPath,
