@@ -33,38 +33,47 @@ function notifyListeners() {
  * Call this once on page load.
  */
 export async function initAuth() {
-  // Listen for auth state changes
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    currentSession = session;
-    currentUser = session?.user ?? null;
-    notifyListeners();
+  console.log('[Auth] initAuth() starting...');
 
-    // After sign-in, store provider tokens server-side
-    if (event === 'SIGNED_IN' && session?.provider_token) {
-      await storeProviderToken(session);
-    }
-  });
+  // Use onAuthStateChange as the sole session source (avoids getSession() deadlock)
+  return new Promise((resolve) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] Event:', event, 'has session:', !!session);
 
-  // Get initial session and validate it
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (session) {
-    // Validate the session is still good by checking with the server
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) {
-      // Session is stale/invalid — clear it
-      console.warn('Stale session detected, signing out');
-      await supabase.auth.signOut();
-      currentSession = null;
-      currentUser = null;
-    } else {
       currentSession = session;
-      currentUser = user;
-    }
-  }
+      currentUser = session?.user ?? null;
 
-  notifyListeners();
-  return currentUser;
+      // On initial load, validate the session is still good
+      if (event === 'INITIAL_SESSION' && session) {
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error || !user) {
+            console.warn('[Auth] Stale session detected, signing out');
+            await supabase.auth.signOut();
+            currentSession = null;
+            currentUser = null;
+          } else {
+            currentUser = user;
+          }
+        } catch (err) {
+          console.error('[Auth] Session validation error:', err);
+        }
+      }
+
+      // After sign-in, store provider tokens server-side
+      if (event === 'SIGNED_IN' && session?.provider_token) {
+        await storeProviderToken(session);
+      }
+
+      notifyListeners();
+
+      // Resolve on the first auth event (INITIAL_SESSION)
+      if (event === 'INITIAL_SESSION') {
+        console.log('[Auth] initAuth() resolved, user:', currentUser?.email || 'none');
+        resolve(currentUser);
+      }
+    });
+  });
 }
 
 /**

@@ -4,6 +4,7 @@
  */
 
 import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-client.js';
+import { getSession as getCachedSession } from './auth.js';
 
 /**
  * Make an authenticated request to a Supabase Edge Function.
@@ -11,10 +12,9 @@ import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-clien
 async function callEdgeFunction(name, { body = null } = {}) {
   console.log(`[API] callEdgeFunction('${name}') entered`);
 
-  // Get fresh session token
-  console.log(`[API] Calling getSession()...`);
-  const { data: { session } } = await supabase.auth.getSession();
-  console.log(`[API] getSession() returned, has session:`, !!session);
+  // Use cached session from auth module (avoids supabase.auth.getSession() deadlock)
+  const session = getCachedSession();
+  console.log(`[API] Using cached session, has session:`, !!session);
 
   if (!session) {
     throw new Error('Not authenticated. Please sign in first.');
