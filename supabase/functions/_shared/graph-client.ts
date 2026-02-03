@@ -155,10 +155,11 @@ export async function* graphFetchAllPages(
 }
 
 /**
- * Parse a SharePoint URL to extract hostname and site path.
+ * Parse a SharePoint URL to extract hostname, site path, and optional library/folder path.
  * Supports URLs like:
  *   https://contoso.sharepoint.com/sites/MySite
  *   https://contoso.sharepoint.com/sites/MySite/Shared Documents/SubFolder
+ *   https://contoso.sharepoint.com/sites/MySite/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FMySite%2FShared%20Documents%2FFolder
  */
 export function parseSharePointUrl(url: string): {
   hostname: string;
@@ -167,7 +168,24 @@ export function parseSharePointUrl(url: string): {
 } {
   const parsed = new URL(url);
   const hostname = parsed.hostname;
-  const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+  // Check for ?id= query parameter (SharePoint view URLs)
+  // e.g. ?id=%2Fsites%2FSiteName%2FShared%20Documents%2FFolder
+  const idParam = parsed.searchParams.get('id');
+  let effectivePath: string;
+
+  if (idParam) {
+    // The id param contains the real path, e.g. /sites/SiteName/Shared Documents/Folder
+    effectivePath = idParam;
+  } else {
+    effectivePath = decodeURIComponent(parsed.pathname);
+  }
+
+  // Strip trailing /Forms/AllItems.aspx or similar view pages
+  effectivePath = effectivePath.replace(/\/Forms\/AllItems\.aspx$/i, '');
+  effectivePath = effectivePath.replace(/\/Forms\/[^/]+\.aspx$/i, '');
+
+  const pathParts = effectivePath.split('/').filter(Boolean);
 
   // Find the site path (e.g., /sites/MySite or /teams/MyTeam)
   let siteIndex = -1;
@@ -187,6 +205,8 @@ export function parseSharePointUrl(url: string): {
   // Everything after the site path could be a library/folder path
   const remainingParts = pathParts.slice(siteIndex + 2);
   const libraryPath = remainingParts.length > 0 ? `/${remainingParts.join('/')}` : null;
+
+  console.log('Parsed SharePoint URL:', { hostname, sitePath, libraryPath, source: idParam ? 'id param' : 'pathname' });
 
   return { hostname, sitePath, libraryPath };
 }
