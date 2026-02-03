@@ -226,6 +226,26 @@ serve(async (req: Request) => {
       }
     }
 
+    // === Rule 6b: Spaces in folder names (URL path length risk) ===
+    for (const file of files) {
+      if (!file.is_folder) continue;
+      if (/\s/.test(file.name)) {
+        const suggested = file.name.replace(/\s+/g, '-');
+        suggestions.push({
+          scan_id,
+          file_id: file.id,
+          category: 'rename',
+          severity: 'medium',
+          title: 'Spaces in folder name',
+          description: `"${file.name}" contains spaces which become %20 in URLs. This inflates URL length for every file inside and can cause sync failures when total path length exceeds 400 characters. Use hyphens or camelCase instead.`,
+          current_value: file.path,
+          suggested_value: suggested,
+          confidence: 0.8,
+        });
+        rulesMatchedFileIds.add(file.id);
+      }
+    }
+
     // === Rule 7: Very old files (>4 years) ===
     for (const file of files) {
       if (file.is_folder) continue;
