@@ -63,21 +63,21 @@
         let providerToken = null;
         let providerRefreshToken = null;
 
+        // Wait for a session WITH provider_token (from the PKCE code exchange).
+        // The first SIGNED_IN may be a stale session from localStorage — skip it.
         const session = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             console.error('[Callback] Auth timed out after 15s');
             reject(new Error('Authentication timed out.'));
           }, 15000);
 
-          // Listen for auth state changes — this is where provider_token comes from
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             console.log('[Callback] Auth event:', event, 'has provider_token:', !!session?.provider_token, 'has session:', !!session);
+            // Only resolve when we get a session WITH provider_token (fresh from OAuth)
             if (session?.provider_token) {
               providerToken = session.provider_token;
               providerRefreshToken = session.provider_refresh_token;
               console.log('[Callback] Captured provider_token (length:', providerToken.length, ')');
-            }
-            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
               clearTimeout(timeout);
               resolve(session);
             }
@@ -91,7 +91,17 @@
         console.log('[Callback] Session obtained. User:', session.user?.email);
         messageEl.textContent = 'Securing tokens...';
 
-        // Store provider tokens server-side using raw fetch (not invoke) for consistency
+        // Refresh the session to ensure we have a valid JWT
+        console.log('[Callback] Refreshing session for fresh JWT...');
+        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+        const freshAccessToken = refreshed?.session?.access_token || session.access_token;
+        if (refreshErr) {
+          console.warn('[Callback] Session refresh failed, using original token:', refreshErr.message);
+        } else {
+          console.log('[Callback] Session refreshed successfully');
+        }
+
+        // Store provider tokens server-side using raw fetch
         if (providerToken) {
           console.log('[Callback] Storing provider token via raw fetch...');
           const storeUrl = `${EDGE_FUNCTION_BASE}/store-token`;
@@ -99,7 +109,7 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
+              'Authorization': `Bearer ${freshAccessToken}`,
               'apikey': SUPABASE_KEY,
             },
             body: JSON.stringify({
