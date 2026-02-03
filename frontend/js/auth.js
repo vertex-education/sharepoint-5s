@@ -35,6 +35,8 @@ function notifyListeners() {
 export async function initAuth() {
   console.log('[Auth] initAuth() starting...');
 
+  let resolved = false;
+
   // Use onAuthStateChange as the sole session source (avoids getSession() deadlock)
   return new Promise((resolve) => {
     supabase.auth.onAuthStateChange(async (event, session) => {
@@ -43,20 +45,23 @@ export async function initAuth() {
       currentSession = session;
       currentUser = session?.user ?? null;
 
-      // On initial load, validate the session is still good
-      if (event === 'INITIAL_SESSION' && session) {
+      // On first load with a session, refresh the JWT to ensure it's valid
+      if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session && !resolved) {
         try {
-          const { data: { user }, error } = await supabase.auth.getUser();
-          if (error || !user) {
-            console.warn('[Auth] Stale session detected, signing out');
+          console.log('[Auth] Refreshing session to get fresh JWT...');
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error || !data.session) {
+            console.warn('[Auth] Session refresh failed, signing out:', error?.message);
             await supabase.auth.signOut();
             currentSession = null;
             currentUser = null;
           } else {
-            currentUser = user;
+            currentSession = data.session;
+            currentUser = data.session.user;
+            console.log('[Auth] Session refreshed, user:', currentUser?.email);
           }
         } catch (err) {
-          console.error('[Auth] Session validation error:', err);
+          console.error('[Auth] Session refresh error:', err);
         }
       }
 
@@ -67,8 +72,9 @@ export async function initAuth() {
 
       notifyListeners();
 
-      // Resolve on the first auth event (INITIAL_SESSION)
-      if (event === 'INITIAL_SESSION') {
+      // Resolve on the first auth event (either INITIAL_SESSION or SIGNED_IN)
+      if (!resolved) {
+        resolved = true;
         console.log('[Auth] initAuth() resolved, user:', currentUser?.email || 'none');
         resolve(currentUser);
       }
