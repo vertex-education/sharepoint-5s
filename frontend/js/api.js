@@ -9,8 +9,13 @@ import { supabase, EDGE_FUNCTION_BASE, SUPABASE_KEY } from './lib/supabase-clien
  * Make an authenticated request to a Supabase Edge Function.
  */
 async function callEdgeFunction(name, { body = null } = {}) {
+  console.log(`[API] callEdgeFunction('${name}') entered`);
+
   // Get fresh session token
+  console.log(`[API] Calling getSession()...`);
   const { data: { session } } = await supabase.auth.getSession();
+  console.log(`[API] getSession() returned, has session:`, !!session);
+
   if (!session) {
     throw new Error('Not authenticated. Please sign in first.');
   }
@@ -22,7 +27,7 @@ async function callEdgeFunction(name, { body = null } = {}) {
     'apikey': SUPABASE_KEY,
   };
 
-  console.log(`[API] Calling ${name}...`);
+  console.log(`[API] Fetching ${url}...`);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -30,6 +35,7 @@ async function callEdgeFunction(name, { body = null } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  console.log(`[API] Fetch completed, status: ${response.status}`);
   const text = await response.text();
   console.log(`[API] ${name} response: ${response.status}`, text.substring(0, 200));
 
