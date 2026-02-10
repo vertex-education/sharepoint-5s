@@ -242,3 +242,15 @@ export async function getLeaderboard() {
 export async function getMySites() {
   return callEdgeFunction('get-my-sites', {});
 }
+
+/**
+ * Continue processing a crawl.
+ * Called during progress polling for large sites to process more folders.
+ * @param {string} scanId
+ * @returns {{ done, processed, remaining, status, total_files, total_folders, total_size_bytes, crawl_progress }}
+ */
+export async function continueCrawl(scanId) {
+  return callEdgeFunction('continue-crawl', {
+    body: { scan_id: scanId },
+  });
+}

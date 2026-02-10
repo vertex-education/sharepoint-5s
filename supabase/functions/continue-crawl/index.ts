@@ -1,19 +1,32 @@
 /**
- * crawl-sharepoint Edge Function
- * Accepts a SharePoint URL, resolves the site/drive, seeds the crawl queue,
- * and processes the first batch of folders.
- *
- * Uses a database-backed queue for resumable, chunked crawling of large sites.
+ * continue-crawl Edge Function
+ * Continues processing the crawl queue for a given scan.
+ * Called by the frontend during progress polling to process remaining folders.
  */
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { verifyAuth } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
-import { graphFetch, graphFetchAllPages, parseSharePointUrl } from '../_shared/graph-client.ts';
+import { graphFetchAllPages } from '../_shared/graph-client.ts';
 
-// Number of folders to process per function invocation
+// Number of folders to process per invocation
 const BATCH_SIZE = 50;
+
+interface ContinueRequest {
+  scan_id: string;
+}
+
+interface ContinueResponse {
+  done: boolean;
+  processed: number;
+  remaining: number;
+  status: string;
+  total_files: number;
+  total_folders: number;
+  total_size_bytes: number;
+  crawl_progress: number;
+}
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -21,50 +34,77 @@ serve(async (req: Request) => {
 
   try {
     const { userId } = await verifyAuth(req);
-    const { sharepoint_url } = await req.json();
+    const { scan_id }: ContinueRequest = await req.json();
 
-    if (!sharepoint_url) {
+    if (!scan_id) {
       return new Response(
-        JSON.stringify({ error: 'sharepoint_url is required' }),
+        JSON.stringify({ error: 'scan_id is required' }),
         { status: 400, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse the URL
-    const { hostname, sitePath, libraryPath } = parseSharePointUrl(sharepoint_url);
-
     const admin = getAdminClient();
 
-    // Create a scan record
+    // Verify the scan belongs to this user and is in crawling state
     const { data: scan, error: scanError } = await admin
       .from('scans')
-      .insert({
-        user_id: userId,
-        sharepoint_url,
-        status: 'crawling',
-      })
-      .select()
+      .select('*')
+      .eq('id', scan_id)
+      .eq('user_id', userId)
       .single();
 
-    if (scanError) throw scanError;
-
-    // Initialize the crawl: resolve site, seed queue, and process first batch
-    const initPromise = initializeCrawl(admin, userId, scan.id, hostname, sitePath, libraryPath);
-
-    // Use EdgeRuntime.waitUntil to continue processing after response is sent
-    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-      EdgeRuntime.waitUntil(initPromise);
-    } else {
-      initPromise.catch(err => console.error('Crawl init error:', err));
+    if (scanError || !scan) {
+      return new Response(
+        JSON.stringify({ error: 'Scan not found or access denied' }),
+        { status: 404, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
+      );
     }
 
+    // If scan is already complete or errored, just return current status
+    if (scan.status !== 'crawling') {
+      return new Response(
+        JSON.stringify({
+          done: scan.status === 'crawled',
+          processed: 0,
+          remaining: 0,
+          status: scan.status,
+          total_files: scan.total_files || 0,
+          total_folders: scan.total_folders || 0,
+          total_size_bytes: scan.total_size_bytes || 0,
+          crawl_progress: scan.crawl_progress || 0,
+        }),
+        { status: 200, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Process the next batch
+    const result = await processBatch(admin, userId, scan_id);
+
+    // Get updated scan data
+    const { data: updatedScan } = await admin
+      .from('scans')
+      .select('status, total_files, total_folders, total_size_bytes, crawl_progress')
+      .eq('id', scan_id)
+      .single();
+
+    const response: ContinueResponse = {
+      done: result.done,
+      processed: result.processed,
+      remaining: result.remaining,
+      status: updatedScan?.status || 'crawling',
+      total_files: updatedScan?.total_files || 0,
+      total_folders: updatedScan?.total_folders || 0,
+      total_size_bytes: updatedScan?.total_size_bytes || 0,
+      crawl_progress: updatedScan?.crawl_progress || 0,
+    };
+
     return new Response(
-      JSON.stringify({ scan_id: scan.id }),
+      JSON.stringify(response),
       { status: 200, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
     );
 
   } catch (err) {
-    console.error('crawl-sharepoint error:', err);
+    console.error('continue-crawl error:', err);
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
@@ -73,106 +113,12 @@ serve(async (req: Request) => {
 });
 
 /**
- * Initialize the crawl: resolve the site, seed the queue with root folders,
- * and process the first batch of folders.
- */
-async function initializeCrawl(
-  admin: any,
-  userId: string,
-  scanId: string,
-  hostname: string,
-  sitePath: string,
-  libraryPath: string | null
-) {
-  try {
-    // 1. Resolve the site ID
-    const site = await graphFetch(userId, `/sites/${hostname}:${sitePath}`);
-    const siteId = site.id;
-
-    await admin.from('scans').update({ site_id: siteId }).eq('id', scanId);
-
-    // 2. Get drives (document libraries) for the site
-    const drivesData = await graphFetch(userId, `/sites/${siteId}/drives`);
-    const drives = drivesData.value || [];
-
-    if (drives.length === 0) {
-      throw new Error('No document libraries found on this site.');
-    }
-
-    // Determine which drives to crawl
-    let targetDrives: any[] = [];
-
-    if (libraryPath) {
-      const decodedLibrary = decodeURIComponent(libraryPath).replace(/^\//, '');
-      const match = drives.find((d: any) =>
-        d.name.toLowerCase() === decodedLibrary.split('/')[0].toLowerCase()
-      );
-      targetDrives = [match || drives[0]];
-    } else {
-      targetDrives = drives;
-    }
-
-    console.log(`Crawling ${targetDrives.length} drive(s):`, targetDrives.map((d: any) => d.name).join(', '));
-
-    // Store the first drive ID for reference
-    await admin.from('scans').update({ drive_id: targetDrives[0].id }).eq('id', scanId);
-
-    // 3. Seed the crawl_queue with root folders
-    const queueItems: any[] = [];
-
-    for (const drive of targetDrives) {
-      let startPath = `/drives/${drive.id}/root`;
-
-      if (libraryPath && targetDrives.length === 1) {
-        const parts = decodeURIComponent(libraryPath).split('/').filter(Boolean);
-        if (parts.length > 1) {
-          const subPath = parts.slice(1).join('/');
-          startPath = `/drives/${drive.id}/root:/${subPath}:`;
-        }
-      }
-
-      queueItems.push({
-        scan_id: scanId,
-        drive_id: drive.id,
-        graph_path: `${startPath}/children`,
-        parent_item_id: null,
-        depth: 0,
-        folder_path: `/${drive.name}/`,
-        status: 'pending',
-      });
-    }
-
-    // Insert initial queue items
-    const { error: queueError } = await admin.from('crawl_queue').insert(queueItems);
-    if (queueError) {
-      console.error('Failed to seed crawl queue:', queueError);
-      throw queueError;
-    }
-
-    console.log(`Seeded ${queueItems.length} root folder(s) to queue for scan ${scanId}`);
-
-    // 4. Process the first batch
-    await processBatch(admin, userId, scanId);
-
-  } catch (err) {
-    console.error('Crawl initialization failed:', err);
-    await admin.from('scans').update({
-      status: 'error',
-      error_message: err.message,
-      updated_at: new Date().toISOString(),
-    }).eq('id', scanId);
-  }
-}
-
-/**
  * Process a batch of folders from the crawl queue.
- * This is the core crawl logic that can be called from both crawl-sharepoint and continue-crawl.
  */
-export async function processBatch(
+async function processBatch(
   admin: any,
   userId: string,
-  scanId: string,
-  batchSize: number = BATCH_SIZE
+  scanId: string
 ): Promise<{ done: boolean; processed: number; remaining: number }> {
   // Fetch pending queue items
   const { data: pendingItems, error: fetchError } = await admin
@@ -182,7 +128,7 @@ export async function processBatch(
     .eq('status', 'pending')
     .order('depth', { ascending: true })
     .order('created_at', { ascending: true })
-    .limit(batchSize);
+    .limit(BATCH_SIZE);
 
   if (fetchError) {
     console.error('Failed to fetch queue items:', fetchError);

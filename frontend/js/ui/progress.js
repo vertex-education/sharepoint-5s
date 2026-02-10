@@ -1,17 +1,19 @@
 /**
  * Progress Component
  * Shows crawl/analysis progress with animated progress bar.
+ * Supports chunked crawling by calling continue-crawl for large sites.
  */
 
 /**
  * Render the progress section.
  * @param {HTMLElement} container
- * @param {{ status: string, crawl_progress: number, total_files: number, total_folders: number, total_size_bytes: number, error_message?: string }} data
+ * @param {{ status: string, crawl_progress: number, total_files: number, total_folders: number, total_size_bytes: number, error_message?: string, remaining?: number }} data
  */
 export function renderProgress(container, data) {
+  const remainingText = data.remaining ? ` (${data.remaining} folders remaining)` : '';
   const statusLabels = {
     pending: 'Preparing...',
-    crawling: `Crawling... ${data.total_files.toLocaleString()} files found`,
+    crawling: `Crawling... ${data.total_files.toLocaleString()} files found${remainingText}`,
     crawled: 'Crawl complete. Starting analysis...',
     analyzing: 'Analyzing files with AI...',
     complete: 'Analysis complete!',
@@ -49,6 +51,7 @@ export function renderProgress(container, data) {
 
 /**
  * Start polling for crawl/analysis status.
+ * For chunked crawls, this also triggers continue-crawl to keep processing folders.
  * @param {string} scanId
  * @param {HTMLElement} container
  * @param {(status: object) => void} onStatusChange
@@ -58,16 +61,55 @@ export function renderProgress(container, data) {
 export function startPolling(scanId, container, { onStatusChange, onComplete, onError }) {
   let active = true;
   let interval = 2000;
+  let isContinuing = false; // Prevent overlapping continue-crawl calls
 
   async function poll() {
     if (!active) return;
 
     try {
       // Import dynamically to avoid circular deps
-      const { getCrawlStatus } = await import('../api.js');
+      const { getCrawlStatus, continueCrawl } = await import('../api.js');
+
+      // First check current status
       const status = await getCrawlStatus(scanId);
 
-      renderProgress(container, status);
+      // If we're in crawling state and not already continuing, trigger continue-crawl
+      // This keeps the chunked crawl moving forward for large sites
+      if (status.status === 'crawling' && !isContinuing) {
+        isContinuing = true;
+        try {
+          const continueResult = await continueCrawl(scanId);
+          console.log('[Progress] Continue crawl result:', continueResult);
+
+          // Use the continue result for the most up-to-date data
+          renderProgress(container, {
+            ...status,
+            crawl_progress: continueResult.crawl_progress,
+            total_files: continueResult.total_files,
+            total_folders: continueResult.total_folders,
+            total_size_bytes: continueResult.total_size_bytes,
+            remaining: continueResult.remaining,
+            status: continueResult.status,
+          });
+
+          // If continue-crawl finished the job, notify and exit
+          if (continueResult.done && continueResult.status === 'crawled') {
+            onStatusChange?.({ status: 'crawled' });
+          } else if (continueResult.status === 'complete') {
+            active = false;
+            onComplete?.();
+            isContinuing = false;
+            return;
+          }
+        } catch (err) {
+          console.error('[Progress] Continue crawl error:', err);
+        }
+        isContinuing = false;
+      } else {
+        // For non-crawling states, just render the current status
+        renderProgress(container, status);
+      }
+
       onStatusChange?.(status);
 
       if (status.status === 'complete') {
@@ -82,12 +124,13 @@ export function startPolling(scanId, container, { onStatusChange, onComplete, on
         return;
       }
 
-      // Adaptive polling: faster during crawling, slower during analysis
-      interval = status.status === 'crawling' ? 2000 : 5000;
+      // Adaptive polling: faster during crawling to keep chunks moving, slower during analysis
+      interval = status.status === 'crawling' ? 1500 : 5000;
       setTimeout(poll, interval);
 
     } catch (err) {
       console.error('Poll error:', err);
+      isContinuing = false;
       if (active) setTimeout(poll, 5000);
     }
   }
