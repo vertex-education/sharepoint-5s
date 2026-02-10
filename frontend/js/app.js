@@ -11,6 +11,8 @@ const state = {
   activeCategory: 'all',
   approvedIds: new Set(),
   fileStats: null,
+  folderTree: null,
+  currentFolderPath: '/',
 };
 
 const listeners = new Set();
@@ -30,11 +32,23 @@ export function onStateChange(callback) {
 }
 
 /**
- * Get the count of suggestions per category.
+ * Get suggestions scoped to the current folder path.
+ */
+function getFolderScopedSuggestions() {
+  if (state.currentFolderPath === '/') return state.suggestions;
+  return state.suggestions.filter(s => {
+    const filePath = s.crawled_files?.path || s.current_value || '';
+    return filePath.startsWith(state.currentFolderPath);
+  });
+}
+
+/**
+ * Get the count of suggestions per category (scoped to current folder).
  */
 export function getCategoryCounts() {
+  const scoped = getFolderScopedSuggestions();
   const counts = { delete: 0, archive: 0, rename: 0, structure: 0 };
-  state.suggestions.forEach(s => {
+  scoped.forEach(s => {
     if (counts.hasOwnProperty(s.category)) {
       counts[s.category]++;
     }
@@ -43,11 +57,20 @@ export function getCategoryCounts() {
 }
 
 /**
- * Get filtered suggestions based on active category.
+ * Get filtered suggestions based on active category and current folder.
  */
 export function getFilteredSuggestions() {
-  if (state.activeCategory === 'all') return state.suggestions;
-  return state.suggestions.filter(s => s.category === state.activeCategory);
+  const scoped = getFolderScopedSuggestions();
+  if (state.activeCategory === 'all') return scoped;
+  return scoped.filter(s => s.category === state.activeCategory);
+}
+
+/**
+ * Set the current folder path and notify listeners.
+ */
+export function setCurrentFolder(path) {
+  state.currentFolderPath = path;
+  listeners.forEach(fn => fn(state));
 }
 
 /**
