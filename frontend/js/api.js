@@ -8,56 +8,23 @@ import { getSession as getCachedSession } from './auth.js';
 
 /**
  * Make an authenticated request to a Supabase Edge Function.
+ * Uses supabase.functions.invoke() which handles auth automatically.
  */
 async function callEdgeFunction(name, { body = null } = {}) {
   console.log(`[API] callEdgeFunction('${name}') entered`);
 
-  // Use cached session from auth module (avoids supabase.auth.getSession() deadlock)
-  const session = getCachedSession();
-  console.log(`[API] Using cached session, has session:`, !!session);
-  console.log(`[API] Session keys:`, session ? Object.keys(session) : 'null');
-  console.log(`[API] Has access_token:`, !!session?.access_token);
-  console.log(`[API] Token preview:`, session?.access_token?.substring(0, 50) + '...');
-
-  if (!session) {
-    throw new Error('Not authenticated. Please sign in first.');
-  }
-
-  if (!session.access_token) {
-    throw new Error('Session missing access_token. Please sign out and sign in again.');
-  }
-
-  const url = `${EDGE_FUNCTION_BASE}/${name}`;
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session.access_token}`,
-    'apikey': SUPABASE_KEY,
-  };
-
-  console.log(`[API] Fetching ${url}...`);
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+  // Use Supabase's built-in invoke which handles auth automatically
+  const { data, error } = await supabase.functions.invoke(name, {
+    body: body || undefined,
   });
 
-  console.log(`[API] Fetch completed, status: ${response.status}`);
-  const text = await response.text();
-  console.log(`[API] ${name} response: ${response.status}`, text.substring(0, 200));
+  console.log(`[API] ${name} response:`, error ? `Error: ${error.message}` : 'Success');
 
-  let result;
-  try {
-    result = JSON.parse(text);
-  } catch {
-    throw new Error(`${name} returned invalid JSON: ${text.substring(0, 100)}`);
+  if (error) {
+    throw new Error(error.message || `${name} failed`);
   }
 
-  if (!response.ok) {
-    throw new Error(result.error || result.message || `${name} failed with ${response.status}`);
-  }
-
-  return result;
+  return data;
 }
 
 /**
