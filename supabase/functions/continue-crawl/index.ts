@@ -136,7 +136,20 @@ async function processBatch(
   }
 
   if (!pendingItems || pendingItems.length === 0) {
-    // No more pending items - crawl is complete
+    // Check if queue was ever seeded (any items exist, regardless of status)
+    const { count: totalQueueItems } = await admin
+      .from('crawl_queue')
+      .select('*', { count: 'exact', head: true })
+      .eq('scan_id', scanId);
+
+    if (!totalQueueItems || totalQueueItems === 0) {
+      // Queue not seeded yet - crawl-sharepoint is still initializing
+      // Return without finalizing, let the next poll try again
+      console.log(`Queue not seeded yet for scan ${scanId}, waiting...`);
+      return { done: false, processed: 0, remaining: 0 };
+    }
+
+    // Queue was seeded and all items processed - crawl is complete
     await finalizeCrawl(admin, scanId);
     return { done: true, processed: 0, remaining: 0 };
   }
