@@ -1,0 +1,201 @@
+/* ═══════════════════════════════════════════════════════
+   LEADERBOARD — Rankings and statistics display
+   ═══════════════════════════════════════════════════════ */
+
+/* Hero Section */
+.leaderboard__hero {
+  text-align: center;
+  padding: var(--space-8) 0;
+}
+
+.leaderboard__title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--text-3xl);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  margin-bottom: var(--space-6);
+}
+
+.leaderboard__title span {
+  color: var(--accent-archive);
+}
+
+/* Aggregate Stats */
+.aggregate-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.stat-card--large .stat-card__value {
+  font-size: var(--text-3xl);
+}
+
+/* Leaderboard List */
+.leaderboard__table {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) 0;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 2fr;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.leaderboard-row:hover {
+  border-color: var(--border-default);
+}
+
+.leaderboard-row--current {
+  border-color: var(--accent-archive);
+  background: var(--accent-archive-dim);
+}
+
+/* Rank */
+.leaderboard-row__rank {
+  font-family: var(--font-display);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--text-xl);
+  text-align: center;
+}
+
+.leaderboard-row__rank--gold {
+  color: #ffd700;
+}
+
+.leaderboard-row__rank--silver {
+  color: #c0c0c0;
+}
+
+.leaderboard-row__rank--bronze {
+  color: #cd7f32;
+}
+
+/* User Info */
+.leaderboard-row__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.leaderboard-row__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  color: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.leaderboard-row__name {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stats */
+.leaderboard-row__stats {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+}
+
+.leaderboard-row__stat {
+  text-align: center;
+  min-width: 70px;
+}
+
+.leaderboard-row__stat-value {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-lg);
+  display: block;
+}
+
+.leaderboard-row__stat-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.leaderboard-row__stat--delete .leaderboard-row__stat-value {
+  color: var(--accent-delete);
+}
+
+.leaderboard-row__stat--rename .leaderboard-row__stat-value {
+  color: var(--accent-rename);
+}
+
+/* Skeleton Loading */
+.skeleton-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .leaderboard-row {
+    grid-template-columns: 50px 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .leaderboard-row__stats {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: var(--space-2);
+  }
+
+  .leaderboard-row__stat {
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaderboard__title {
+    font-size: var(--text-2xl);
+  }
+
+  .aggregate-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .leaderboard-row__stats {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+}

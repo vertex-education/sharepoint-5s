@@ -17,6 +17,11 @@
       <a href="index.html" class="header__logo" style="text-decoration:none;">
         <span>5</span>S
       </a>
+      <nav class="header__nav" id="headerNav">
+        <a href="index.html" class="header__nav-link">Scan</a>
+        <a href="my-sites.html" class="header__nav-link">My Sites</a>
+        <a href="leaderboard.html" class="header__nav-link">Leaderboard</a>
+      </nav>
       <div class="header__center" id="headerCenter"></div>
       <div class="header__right" id="headerRight"></div>
     </header>
@@ -33,6 +38,11 @@
         <!-- Stats Section -->
         <section id="statsSection" style="display:none;">
           <div id="statsContainer"></div>
+        </section>
+
+        <!-- Folder Navigation -->
+        <section id="folderNavSection" style="display:none;">
+          <div id="folderNavContainer"></div>
         </section>
 
         <!-- Divider -->
@@ -63,7 +73,7 @@
 
   <script type="module">
     import { initAuth, signOut, isSignedIn, getUserDisplay, onAuthChange } from './js/auth.js';
-    import { startCrawl, startAnalysis, getSuggestions, getFileStats, getScan, updateSuggestionDecision, executeActions } from './js/api.js';
+    import { startCrawl, startAnalysis, getSuggestions, getFileStats, getScan, getFolders, updateSuggestionDecision, executeActions } from './js/api.js';
     import { renderProgress, startPolling } from './js/ui/progress.js';
     import { renderStatsPanel } from './js/ui/stats-panel.js';
     import { renderCategoryTabs } from './js/ui/category-tabs.js';
@@ -75,7 +85,10 @@
       getState, setState, onStateChange, getCategoryCounts,
       getFilteredSuggestions, getApprovedCount, markApproved,
       markRejected, getApprovedBreakdown, getApprovedSuggestionIds,
+      setCurrentFolder,
     } from './js/app.js';
+    import { buildFolderTree } from './js/ui/folder-tree.js';
+    import { renderFolderNav } from './js/ui/folder-nav.js';
 
     // DOM elements
     const headerCenter = document.getElementById('headerCenter');
@@ -84,6 +97,8 @@
     const progressContainer = document.getElementById('progressContainer');
     const statsSection = document.getElementById('statsSection');
     const statsContainer = document.getElementById('statsContainer');
+    const folderNavSection = document.getElementById('folderNavSection');
+    const folderNavContainer = document.getElementById('folderNavContainer');
     const divider = document.getElementById('divider');
     const tabsSection = document.getElementById('tabsSection');
     const tabsContainer = document.getElementById('tabsContainer');
@@ -222,16 +237,21 @@
       scanLine.style.display = 'none';
 
       try {
-        // Load suggestions and file stats in parallel
-        const [suggestions, fileStats] = await Promise.all([
+        // Load suggestions, file stats, and folders in parallel
+        const [suggestions, fileStats, folders] = await Promise.all([
           getSuggestions(id),
           getFileStats(id),
+          getFolders(id),
         ]);
 
-        setState({ suggestions, fileStats });
+        // Build folder tree from folders + suggestions
+        const folderTree = buildFolderTree(folders, suggestions);
+
+        setState({ suggestions, fileStats, folderTree, currentFolderPath: '/' });
 
         // Show all sections
         statsSection.style.display = 'block';
+        folderNavSection.style.display = 'block';
         divider.style.display = 'block';
         tabsSection.style.display = 'block';
         listSection.style.display = 'block';
@@ -242,6 +262,12 @@
       }
     }
 
+    function handleFolderNavigate(path) {
+      setCurrentFolder(path);
+      setState({ activeCategory: 'all' });
+      renderDashboard();
+    }
+
     function renderDashboard() {
       const state = getState();
       const counts = getCategoryCounts();
@@ -250,6 +276,11 @@
 
       // Stats
       renderStatsPanel(statsContainer, state.fileStats, counts);
+
+      // Folder nav
+      renderFolderNav(folderNavContainer, state.folderTree, state.currentFolderPath, {
+        onNavigate: handleFolderNavigate,
+      });
 
       // Tabs
       renderCategoryTabs(tabsContainer, counts, state.activeCategory, (category) => {
@@ -324,9 +355,13 @@
         }
 
         // Reload suggestions to reflect updated state
-        const state = getState();
-        const suggestions = await getSuggestions(state.scanId);
-        setState({ suggestions });
+        const curState = getState();
+        const [newSuggestions, newFolders] = await Promise.all([
+          getSuggestions(curState.scanId),
+          getFolders(curState.scanId),
+        ]);
+        const newTree = buildFolderTree(newFolders, newSuggestions);
+        setState({ suggestions: newSuggestions, folderTree: newTree });
         renderDashboard();
 
       } catch (err) {

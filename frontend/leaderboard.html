@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5S — Leaderboard</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/leaderboard.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="index.html" class="header__logo" style="text-decoration:none;">
+        <span>5</span>S
+      </a>
+      <nav class="header__nav" id="headerNav">
+        <a href="index.html" class="header__nav-link">Scan</a>
+        <a href="my-sites.html" class="header__nav-link">My Sites</a>
+        <a href="leaderboard.html" class="header__nav-link header__nav-link--active">Leaderboard</a>
+      </nav>
+      <div class="header__right" id="headerRight"></div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Hero Section -->
+      <section class="leaderboard__hero" id="heroSection">
+        <h1 class="leaderboard__title">
+          <span>5</span>S Leaderboard
+        </h1>
+        <div id="aggregateStats">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Leaderboard Table -->
+      <section class="leaderboard__table" id="tableSection">
+        <div id="leaderboardContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module">
+    import { initAuth, signOut, isSignedIn, getUserDisplay, onAuthChange, getUser } from './js/auth.js';
+    import { getLeaderboard } from './js/api.js';
+    import { showToast } from './js/ui/toast.js';
+    import { renderLeaderboard, renderAggregates, renderLeaderboardSkeleton } from './js/ui/leaderboard.js';
+
+    // DOM elements
+    const headerRight = document.getElementById('headerRight');
+    const aggregateStats = document.getElementById('aggregateStats');
+    const leaderboardContainer = document.getElementById('leaderboardContainer');
+
+    // ─── Auth Header ───
+    function renderHeaderAuth(user) {
+      if (user) {
+        const display = getUserDisplay();
+        headerRight.innerHTML = `
+          <div class="header__user">
+            <span style="width:28px;height:28px;border-radius:var(--radius-sm);background:var(--accent-archive);color:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:var(--weight-bold);font-size:var(--text-xs);">${display.initials}</span>
+            <span>${display.name}</span>
+          </div>
+          <button class="btn btn--ghost btn--sm" id="signOutBtn">Sign Out</button>
+        `;
+        document.getElementById('signOutBtn').addEventListener('click', async () => {
+          await signOut();
+          window.location.href = 'index.html';
+        });
+      } else {
+        headerRight.innerHTML = `
+          <a href="index.html" class="btn btn--primary btn--sm">Sign In</a>
+        `;
+      }
+    }
+
+    // ─── Load Leaderboard ───
+    async function loadLeaderboard() {
+      renderLeaderboardSkeleton(leaderboardContainer);
+
+      try {
+        const { leaderboard, aggregates, current_user_id } = await getLeaderboard();
+
+        renderAggregates(aggregateStats, aggregates);
+        renderLeaderboard(leaderboardContainer, leaderboard, current_user_id);
+
+      } catch (err) {
+        console.error('Failed to load leaderboard:', err);
+        showToast(err.message || 'Failed to load leaderboard', 'error');
+
+        leaderboardContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">⚠️</div>
+            <div class="empty-state__title">Failed to Load</div>
+            <div class="empty-state__text">${err.message || 'An error occurred while loading the leaderboard.'}</div>
+          </div>
+        `;
+      }
+    }
+
+    // ─── Init ───
+    async function init() {
+      const user = await initAuth();
+      onAuthChange(renderHeaderAuth);
+
+      if (!isSignedIn()) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      loadLeaderboard();
+    }
+
+    init();
+  </script>
+</body>
+</html>

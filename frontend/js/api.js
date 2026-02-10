@@ -180,6 +180,23 @@ export async function getRecentScans(limit = 10) {
 }
 
 /**
+ * Get all folders for a scan (lightweight query for folder navigation).
+ * @param {string} scanId
+ * @returns {Array<{ id, name, path, depth, parent_item_id }>}
+ */
+export async function getFolders(scanId) {
+  const { data, error } = await supabase
+    .from('crawled_files')
+    .select('id, name, path, depth, parent_item_id')
+    .eq('scan_id', scanId)
+    .eq('is_folder', true)
+    .order('depth', { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Get file statistics for a scan.
  * @param {string} scanId
  */
@@ -234,4 +251,20 @@ export async function getFileStats(scanId) {
   stats.avgAge = stats.totalFiles > 0 ? Math.round(totalAge / stats.totalFiles / (24 * 60 * 60 * 1000)) : 0;
 
   return stats;
+}
+
+/**
+ * Get leaderboard data (all-time stats).
+ * @returns {{ leaderboard: Array, aggregates: object, current_user_id: string }}
+ */
+export async function getLeaderboard() {
+  return callEdgeFunction('get-leaderboard', {});
+}
+
+/**
+ * Get user's SharePoint sites with scan data.
+ * @returns {{ sites: Array, summary: object }}
+ */
+export async function getMySites() {
+  return callEdgeFunction('get-my-sites', {});
 }

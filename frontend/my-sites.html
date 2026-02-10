@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5S — My Sites</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/my-sites.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="index.html" class="header__logo" style="text-decoration:none;">
+        <span>5</span>S
+      </a>
+      <nav class="header__nav" id="headerNav">
+        <a href="index.html" class="header__nav-link">Scan</a>
+        <a href="my-sites.html" class="header__nav-link header__nav-link--active">My Sites</a>
+        <a href="leaderboard.html" class="header__nav-link">Leaderboard</a>
+      </nav>
+      <div class="header__right" id="headerRight"></div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Summary Section -->
+      <section class="my-sites__summary" id="summarySection">
+        <div id="summaryContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Filter Tabs -->
+      <section class="my-sites__filters" id="filtersSection">
+        <div id="filtersContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- Sites Grid -->
+      <section class="my-sites__grid" id="sitesSection">
+        <div id="sitesContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module">
+    import { initAuth, signOut, isSignedIn, getUserDisplay, onAuthChange } from './js/auth.js';
+    import { getMySites } from './js/api.js';
+    import { showToast } from './js/ui/toast.js';
+    import { renderSitesList, renderSitesSummary, renderFilterTabs, renderSitesSkeleton } from './js/ui/my-sites.js';
+
+    // DOM elements
+    const headerRight = document.getElementById('headerRight');
+    const summaryContainer = document.getElementById('summaryContainer');
+    const filtersContainer = document.getElementById('filtersContainer');
+    const sitesContainer = document.getElementById('sitesContainer');
+
+    // State
+    let sitesData = [];
+    let currentFilter = 'all';
+
+    // ─── Auth Header ───
+    function renderHeaderAuth(user) {
+      if (user) {
+        const display = getUserDisplay();
+        headerRight.innerHTML = `
+          <div class="header__user">
+            <span style="width:28px;height:28px;border-radius:var(--radius-sm);background:var(--accent-archive);color:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:var(--weight-bold);font-size:var(--text-xs);">${display.initials}</span>
+            <span>${display.name}</span>
+          </div>
+          <button class="btn btn--ghost btn--sm" id="signOutBtn">Sign Out</button>
+        `;
+        document.getElementById('signOutBtn').addEventListener('click', async () => {
+          await signOut();
+          window.location.href = 'index.html';
+        });
+      } else {
+        headerRight.innerHTML = `
+          <a href="index.html" class="btn btn--primary btn--sm">Sign In</a>
+        `;
+      }
+    }
+
+    // ─── Handle Filter Change ───
+    function handleFilterChange(filter) {
+      currentFilter = filter;
+      renderUI();
+    }
+
+    // ─── Render UI ───
+    function renderUI() {
+      const counts = {
+        all: sitesData.length,
+        scanned: sitesData.filter(s => s.has_scans).length,
+        'not-scanned': sitesData.filter(s => !s.has_scans).length,
+      };
+
+      renderFilterTabs(filtersContainer, currentFilter, counts, handleFilterChange);
+      renderSitesList(sitesContainer, sitesData, currentFilter);
+    }
+
+    // ─── Load Sites ───
+    async function loadSites() {
+      renderSitesSkeleton(sitesContainer);
+
+      try {
+        const { sites, summary } = await getMySites();
+
+        sitesData = sites;
+
+        renderSitesSummary(summaryContainer, summary);
+        renderUI();
+
+      } catch (err) {
+        console.error('Failed to load sites:', err);
+        showToast(err.message || 'Failed to load sites', 'error');
+
+        sitesContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">⚠️</div>
+            <div class="empty-state__title">Failed to Load</div>
+            <div class="empty-state__text">${err.message || 'An error occurred while loading your sites.'}</div>
+          </div>
+        `;
+      }
+    }
+
+    // ─── Init ───
+    async function init() {
+      const user = await initAuth();
+      onAuthChange(renderHeaderAuth);
+
+      if (!isSignedIn()) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      loadSites();
+    }
+
+    init();
+  </script>
+</body>
+</html>

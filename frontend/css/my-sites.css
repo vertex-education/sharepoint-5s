@@ -1,0 +1,262 @@
+/* ═══════════════════════════════════════════════════════
+   MY SITES — Personal dashboard for SharePoint sites
+   ═══════════════════════════════════════════════════════ */
+
+/* Hero Section */
+.my-sites__hero {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.my-sites__title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--text-2xl);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  margin-bottom: var(--space-2);
+}
+
+.my-sites__subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Summary Stats */
+.my-sites__summary {
+  padding: var(--space-6) 0;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Filter Section */
+.my-sites__filters {
+  margin: var(--space-4) 0 var(--space-6);
+}
+
+/* Sites Grid */
+.my-sites__grid {
+  padding-bottom: var(--space-8);
+}
+
+.sites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Site Card */
+.site-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.site-card:hover {
+  border-color: var(--border-default);
+}
+
+.site-card--scanned {
+  border-left: 3px solid var(--accent-approve);
+}
+
+/* Card Header */
+.site-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.site-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+  flex-shrink: 0;
+}
+
+.site-card--scanned .site-card__icon {
+  background: var(--accent-approve-dim);
+  color: var(--accent-approve);
+}
+
+.site-card__name {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Card Description */
+.site-card__description {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Card Stats */
+.site-card__stats {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-card__stat {
+  text-align: center;
+  flex: 1;
+}
+
+.site-card__stat-value {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-lg);
+  display: block;
+}
+
+.site-card__stat-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+/* Card Breakdown Tags */
+.site-card__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.site-card__tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.site-card__tag--delete {
+  background: var(--accent-delete-dim);
+  color: var(--accent-delete);
+}
+
+.site-card__tag--rename {
+  background: var(--accent-rename-dim);
+  color: var(--accent-rename);
+}
+
+.site-card__tag--archive {
+  background: var(--accent-archive-dim);
+  color: var(--accent-archive);
+}
+
+/* Card Footer */
+.site-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.site-card__date {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Status Badges */
+.badge--complete {
+  background: var(--accent-approve-dim);
+  color: var(--accent-approve);
+  border-color: var(--accent-approve);
+}
+
+.badge--error {
+  background: var(--accent-delete-dim);
+  color: var(--accent-delete);
+  border-color: var(--accent-delete);
+}
+
+.badge--crawling,
+.badge--analyzing {
+  background: var(--accent-archive-dim);
+  color: var(--accent-archive);
+  border-color: var(--accent-archive);
+}
+
+/* Card CTA (for unscanned sites) */
+.site-card__cta {
+  padding: var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-card__cta-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* Card Actions */
+.site-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sites-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .my-sites__title {
+    font-size: var(--text-xl);
+  }
+
+  .site-card__stats {
+    flex-wrap: wrap;
+  }
+
+  .site-card__stat {
+    min-width: 60px;
+  }
+}
