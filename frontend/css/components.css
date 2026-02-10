@@ -237,6 +237,19 @@
   border: 1px solid;
 }
 
+.suggestion-card__source-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wider);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-structure-dim);
+  color: var(--accent-structure);
+  border: 1px solid var(--accent-structure);
+  text-transform: uppercase;
+}
+
 .suggestion-card__severity--critical { color: var(--accent-delete); border-color: var(--accent-delete); background: var(--accent-delete-dim); }
 .suggestion-card__severity--high { color: var(--accent-archive); border-color: var(--accent-archive); background: var(--accent-archive-dim); }
 .suggestion-card__severity--medium { color: var(--accent-rename); border-color: var(--accent-rename); background: var(--accent-rename-dim); }
@@ -321,6 +334,12 @@
 .suggestion-card--rejected {
   opacity: 0.3;
   filter: grayscale(0.8);
+}
+
+.suggestion-card--executed {
+  opacity: 0.4;
+  border-color: var(--accent-approve);
+  background: var(--accent-approve-dim);
 }
 
 /* ── Stat Card ── */
@@ -684,6 +703,155 @@
 .toolbar__actions {
   display: flex;
   gap: var(--space-2);
+}
+
+/* ── Folder Navigation ── */
+.folder-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.folder-nav__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--space-1);
+}
+
+.folder-nav__crumb {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.folder-nav__crumb:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.folder-nav__crumb--active {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+  cursor: default;
+}
+
+.folder-nav__crumb--active:hover {
+  background: transparent;
+}
+
+.folder-nav__separator {
+  color: var(--text-tertiary);
+  opacity: 0.4;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.folder-nav__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.folder-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.folder-card:hover {
+  border-color: var(--border-default);
+  background: var(--bg-hover);
+}
+
+.folder-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.folder-card__name {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.folder-card__icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.folder-card__badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+}
+
+.folder-card__badge--warm {
+  background: var(--accent-archive-dim);
+  color: var(--accent-archive);
+}
+
+.folder-card__badge--hot {
+  background: var(--accent-delete-dim);
+  color: var(--accent-delete);
+}
+
+.folder-card__bar {
+  height: 3px;
+  border-radius: 2px;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.folder-card__bar-segment {
+  height: 100%;
+  transition: width var(--duration-fast) var(--ease-out);
+}
+
+.folder-card__bar-segment--delete { background: var(--accent-delete); }
+.folder-card__bar-segment--archive { background: var(--accent-archive); }
+.folder-card__bar-segment--rename { background: var(--accent-rename); }
+.folder-card__bar-segment--structure { background: var(--accent-structure); }
+
+.folder-card--clean {
+  opacity: 0.5;
+}
+
+.folder-card--clean:hover {
+  opacity: 0.8;
 }
 
 /* ── Skeleton Loading ── */

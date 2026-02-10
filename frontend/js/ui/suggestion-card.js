@@ -31,12 +31,14 @@ export function createSuggestionCard(suggestion, { onApprove, onReject }) {
   const ext = file?.name?.split('.').pop()?.toLowerCase() || 'default';
   const icon = file?.is_folder ? FILE_ICONS.folder : (FILE_ICONS[ext] || FILE_ICONS.default);
   const isDecided = suggestion.user_decision !== 'pending';
+  const isExecuted = suggestion.user_decision === 'executed';
 
   el.innerHTML = `
     <div class="suggestion-card__icon">${icon}</div>
     <div>
       <div class="suggestion-card__header">
         <span class="suggestion-card__title">${escapeHtml(suggestion.title)}</span>
+        ${suggestion.source === 'ai' ? '<span class="suggestion-card__source-badge">AI</span>' : ''}
         <span class="suggestion-card__severity suggestion-card__severity--${suggestion.severity}">
           ${suggestion.severity}
         </span>
@@ -72,8 +74,12 @@ export function createSuggestionCard(suggestion, { onApprove, onReject }) {
             \u2713 APPROVE
           </button>
         ` : `
-          <span class="badge" style="${suggestion.user_decision === 'approved' ? 'color:var(--accent-approve);border-color:var(--accent-approve);' : 'color:var(--text-tertiary);'}">
-            ${suggestion.user_decision.toUpperCase()}
+          <span class="badge" style="${
+            isExecuted ? 'color:var(--accent-approve);border-color:var(--accent-approve);background:var(--accent-approve-dim);'
+            : suggestion.user_decision === 'approved' ? 'color:var(--accent-approve);border-color:var(--accent-approve);'
+            : 'color:var(--text-tertiary);'
+          }">
+            ${isExecuted ? '\u2713 DONE' : suggestion.user_decision.toUpperCase()}
           </span>
         `}
       </div>
@@ -98,6 +104,7 @@ export function createSuggestionCard(suggestion, { onApprove, onReject }) {
 }
 
 function getDecisionClass(decision) {
+  if (decision === 'executed') return 'suggestion-card--executed';
   if (decision === 'approved') return 'suggestion-card--approved';
   if (decision === 'rejected') return 'suggestion-card--rejected';
   return '';
