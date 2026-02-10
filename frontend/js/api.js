@@ -15,9 +15,16 @@ async function callEdgeFunction(name, { body = null } = {}) {
   // Use cached session from auth module (avoids supabase.auth.getSession() deadlock)
   const session = getCachedSession();
   console.log(`[API] Using cached session, has session:`, !!session);
+  console.log(`[API] Session keys:`, session ? Object.keys(session) : 'null');
+  console.log(`[API] Has access_token:`, !!session?.access_token);
+  console.log(`[API] Token preview:`, session?.access_token?.substring(0, 50) + '...');
 
   if (!session) {
     throw new Error('Not authenticated. Please sign in first.');
+  }
+
+  if (!session.access_token) {
+    throw new Error('Session missing access_token. Please sign out and sign in again.');
   }
 
   const url = `${EDGE_FUNCTION_BASE}/${name}`;
