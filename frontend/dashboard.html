@@ -144,8 +144,9 @@
         return;
       }
 
-      if (sharepointUrl && !scanId) {
-        // Start a new crawl
+      // URL parameter takes precedence - always start a fresh scan
+      if (sharepointUrl) {
+        // Start a new crawl (rescan)
         await startNewCrawl(sharepointUrl);
       } else if (scanId) {
         // Resume an existing scan
