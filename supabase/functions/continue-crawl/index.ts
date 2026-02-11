@@ -120,6 +120,21 @@ async function processBatch(
   userId: string,
   scanId: string
 ): Promise<{ done: boolean; processed: number; remaining: number }> {
+  // First, recover any items stuck in 'processing' status (from crashed/timed out runs)
+  // Items older than 2 minutes in 'processing' are considered stuck
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { count: stuckCount } = await admin
+    .from('crawl_queue')
+    .update({ status: 'pending' })
+    .eq('scan_id', scanId)
+    .eq('status', 'processing')
+    .lt('created_at', twoMinutesAgo)
+    .select('*', { count: 'exact', head: true });
+
+  if (stuckCount && stuckCount > 0) {
+    console.log(`Recovered ${stuckCount} stuck items for scan ${scanId}`);
+  }
+
   // Fetch pending queue items
   const { data: pendingItems, error: fetchError } = await admin
     .from('crawl_queue')
@@ -136,6 +151,18 @@ async function processBatch(
   }
 
   if (!pendingItems || pendingItems.length === 0) {
+    // Check if there are items stuck in 'processing' (recently started, give them more time)
+    const { count: processingCount } = await admin
+      .from('crawl_queue')
+      .select('*', { count: 'exact', head: true })
+      .eq('scan_id', scanId)
+      .eq('status', 'processing');
+
+    if (processingCount && processingCount > 0) {
+      console.log(`${processingCount} items still processing for scan ${scanId}, waiting...`);
+      return { done: false, processed: 0, remaining: processingCount };
+    }
+
     // Check if queue was ever seeded (any items exist, regardless of status)
     const { count: totalQueueItems } = await admin
       .from('crawl_queue')

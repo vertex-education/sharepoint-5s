@@ -174,6 +174,16 @@ export async function processBatch(
   scanId: string,
   batchSize: number = BATCH_SIZE
 ): Promise<{ done: boolean; processed: number; remaining: number }> {
+  // First, recover any items stuck in 'processing' status (from crashed/timed out runs)
+  // Items older than 2 minutes in 'processing' are considered stuck
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  await admin
+    .from('crawl_queue')
+    .update({ status: 'pending' })
+    .eq('scan_id', scanId)
+    .eq('status', 'processing')
+    .lt('created_at', twoMinutesAgo);
+
   // Fetch pending queue items
   const { data: pendingItems, error: fetchError } = await admin
     .from('crawl_queue')
