@@ -1,7 +1,202 @@
 /**
  * My Sites UI Components
  * Renders the personal dashboard showing user's SharePoint sites.
+ * Supports in-place scanning with background progress.
  */
+
+// Track active scans: { siteUrl: { scanId, status, progress, ... } }
+const activeScans = new Map();
+
+// Callbacks for scan events
+let onScanComplete = null;
+
+/**
+ * Set callback for when a scan completes
+ */
+export function setOnScanComplete(callback) {
+  onScanComplete = callback;
+}
+
+/**
+ * Start a scan for a site (called from button click)
+ */
+export async function startSiteScan(siteUrl, siteName) {
+  // Dynamically import to avoid circular deps
+  const { startCrawl, getCrawlStatus, continueCrawl } = await import('../api.js');
+  const { showToast } = await import('./toast.js');
+
+  try {
+    showToast(`Starting scan for ${siteName}...`, 'info');
+
+    // Start the crawl
+    const { scan_id } = await startCrawl(siteUrl);
+
+    // Track the active scan
+    activeScans.set(siteUrl, {
+      scanId: scan_id,
+      status: 'crawling',
+      progress: 0,
+      totalFiles: 0,
+      totalFolders: 0,
+      totalSize: 0,
+    });
+
+    // Update the UI immediately
+    updateSiteCardProgress(siteUrl);
+
+    // Start polling for this scan
+    pollScanStatus(siteUrl, scan_id);
+
+  } catch (err) {
+    console.error('Failed to start scan:', err);
+    showToast(`Failed to start scan: ${err.message}`, 'error');
+    activeScans.delete(siteUrl);
+  }
+}
+
+/**
+ * Poll for scan status and update UI
+ */
+async function pollScanStatus(siteUrl, scanId) {
+  const { getCrawlStatus, continueCrawl } = await import('../api.js');
+  const { showToast } = await import('./toast.js');
+
+  const poll = async () => {
+    const scanInfo = activeScans.get(siteUrl);
+    if (!scanInfo) return; // Scan was cancelled
+
+    try {
+      // Get current status
+      const status = await getCrawlStatus(scanId);
+
+      // If still crawling, trigger continue-crawl to process more batches
+      if (status.status === 'crawling') {
+        try {
+          const continueResult = await continueCrawl(scanId);
+          // Update with more accurate data from continue-crawl
+          scanInfo.status = continueResult.status;
+          scanInfo.progress = continueResult.crawl_progress || 0;
+          scanInfo.totalFiles = continueResult.total_files || 0;
+          scanInfo.totalFolders = continueResult.total_folders || 0;
+          scanInfo.totalSize = continueResult.total_size_bytes || 0;
+          scanInfo.remaining = continueResult.remaining || 0;
+        } catch (e) {
+          console.error('Continue crawl error:', e);
+        }
+      } else {
+        // Use status from getCrawlStatus for non-crawling states
+        scanInfo.status = status.status;
+        scanInfo.progress = status.crawl_progress || 0;
+        scanInfo.totalFiles = status.total_files || 0;
+        scanInfo.totalFolders = status.total_folders || 0;
+        scanInfo.totalSize = status.total_size_bytes || 0;
+      }
+
+      // Update UI
+      updateSiteCardProgress(siteUrl);
+
+      // Check if complete
+      if (status.status === 'complete') {
+        showToast(`Scan complete: ${scanInfo.totalFiles.toLocaleString()} files analyzed`, 'success');
+        activeScans.delete(siteUrl);
+        onScanComplete?.();
+        return;
+      }
+
+      if (status.status === 'error') {
+        showToast(`Scan failed: ${status.error_message || 'Unknown error'}`, 'error');
+        activeScans.delete(siteUrl);
+        updateSiteCardProgress(siteUrl); // Clear the progress UI
+        return;
+      }
+
+      // Continue polling
+      const interval = status.status === 'crawling' ? 1500 : 3000;
+      setTimeout(poll, interval);
+
+    } catch (err) {
+      console.error('Poll error:', err);
+      // Retry after a delay
+      setTimeout(poll, 5000);
+    }
+  };
+
+  poll();
+}
+
+/**
+ * Update a site card to show scan progress
+ */
+function updateSiteCardProgress(siteUrl) {
+  const card = document.querySelector(`[data-site-url="${CSS.escape(siteUrl)}"]`);
+  if (!card) return;
+
+  const scanInfo = activeScans.get(siteUrl);
+  const actionsDiv = card.querySelector('.site-card__actions');
+  const progressDiv = card.querySelector('.site-card__progress');
+
+  if (!scanInfo) {
+    // No active scan - restore normal actions
+    if (progressDiv) progressDiv.remove();
+    if (actionsDiv) actionsDiv.style.display = '';
+    return;
+  }
+
+  // Hide normal actions, show progress
+  if (actionsDiv) actionsDiv.style.display = 'none';
+
+  // Create or update progress div
+  let progress = progressDiv;
+  if (!progress) {
+    progress = document.createElement('div');
+    progress.className = 'site-card__progress';
+    card.appendChild(progress);
+  }
+
+  const statusText = getStatusText(scanInfo);
+  const progressPercent = scanInfo.progress || 0;
+
+  progress.innerHTML = `
+    <div class="scan-progress">
+      <div class="scan-progress__bar-container">
+        <div class="scan-progress__bar scan-progress__bar--striped" style="width: ${progressPercent}%;"></div>
+      </div>
+      <div class="scan-progress__text">
+        <span>${statusText}</span>
+        <span>${progressPercent}%</span>
+      </div>
+      ${scanInfo.totalFiles > 0 ? `
+        <div class="scan-progress__stats">
+          ${scanInfo.totalFiles.toLocaleString()} files &middot; ${formatBytes(scanInfo.totalSize)}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function getStatusText(scanInfo) {
+  switch (scanInfo.status) {
+    case 'crawling':
+      return scanInfo.remaining ? `Crawling... (${scanInfo.remaining} folders remaining)` : 'Crawling...';
+    case 'crawled':
+      return 'Starting analysis...';
+    case 'analyzing':
+      return 'Analyzing with AI...';
+    case 'complete':
+      return 'Complete!';
+    case 'error':
+      return 'Error';
+    default:
+      return 'Processing...';
+  }
+}
+
+/**
+ * Check if a site is currently being scanned
+ */
+export function isSiteScanning(siteUrl) {
+  return activeScans.has(siteUrl);
+}
 
 /**
  * Render personal summary stats
@@ -94,6 +289,18 @@ export function renderSitesList(container, sites, filter = 'all') {
       ${filtered.map((site, i) => renderSiteCard(site, i)).join('')}
     </div>
   `;
+
+  // Attach click handlers for scan buttons
+  container.querySelectorAll('.site-card__scan-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const siteUrl = btn.dataset.siteUrl;
+      const siteName = btn.dataset.siteName;
+      if (!isSiteScanning(siteUrl)) {
+        startSiteScan(siteUrl, siteName);
+      }
+    });
+  });
 }
 
 /**
@@ -103,9 +310,10 @@ function renderSiteCard(site, index) {
   const hasScans = site.has_scans;
   const latestScan = site.latest_scan;
   const staggerClass = Math.min(index + 1, 10);
+  const isScanning = isSiteScanning(site.web_url);
 
   return `
-    <div class="site-card ${hasScans ? 'site-card--scanned' : ''} animate-fade-in-up stagger-${staggerClass}">
+    <div class="site-card ${hasScans ? 'site-card--scanned' : ''} ${isScanning ? 'site-card--scanning' : ''} animate-fade-in-up stagger-${staggerClass}" data-site-url="${escapeAttr(site.web_url)}">
       <div class="site-card__header">
         <div class="site-card__icon">${hasScans ? '✓' : '📁'}</div>
         <h3 class="site-card__name" title="${escapeHtml(site.display_name)}">${escapeHtml(site.display_name)}</h3>
@@ -148,9 +356,9 @@ function renderSiteCard(site, index) {
         ${hasScans && latestScan.status === 'complete' ? `
           <a href="dashboard.html?scan_id=${latestScan.id}" class="btn btn--sm btn--ghost">View Results</a>
         ` : ''}
-        <a href="dashboard.html?url=${encodeURIComponent(site.web_url)}" class="btn btn--sm btn--primary">
-          ${hasScans ? 'Rescan' : 'Scan Now'}
-        </a>
+        <button class="btn btn--sm btn--primary site-card__scan-btn" data-site-url="${escapeAttr(site.web_url)}" data-site-name="${escapeAttr(site.display_name)}" ${isScanning ? 'disabled' : ''}>
+          ${isScanning ? 'Scanning...' : (hasScans ? 'Rescan' : 'Scan Now')}
+        </button>
       </div>
     </div>
   `;
@@ -213,9 +421,21 @@ function formatDate(iso) {
   });
 }
 
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function escapeAttr(str) {
+  if (!str) return '';
+  return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

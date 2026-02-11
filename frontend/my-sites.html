@@ -58,7 +58,7 @@
     import { initAuth, signOut, isSignedIn, getUserDisplay, onAuthChange } from './js/auth.js';
     import { getMySites } from './js/api.js';
     import { showToast } from './js/ui/toast.js';
-    import { renderSitesList, renderSitesSummary, renderFilterTabs, renderSitesSkeleton } from './js/ui/my-sites.js';
+    import { renderSitesList, renderSitesSummary, renderFilterTabs, renderSitesSkeleton, setOnScanComplete } from './js/ui/my-sites.js';
 
     // DOM elements
     const headerRight = document.getElementById('headerRight');
@@ -145,6 +145,11 @@
         window.location.href = 'index.html';
         return;
       }
+
+      // Refresh data when a scan completes
+      setOnScanComplete(() => {
+        loadSites();
+      });
 
       loadSites();
     }
