@@ -58,7 +58,7 @@
     import { initAuth, signOut, isSignedIn, getUserDisplay, onAuthChange } from './js/auth.js';
     import { getMySites } from './js/api.js';
     import { showToast } from './js/ui/toast.js';
-    import { renderSitesList, renderSitesSummary, renderFilterTabs, renderSitesSkeleton, setOnScanComplete } from './js/ui/my-sites.js';
+    import { renderSitesList, renderSitesSummary, renderFilterTabs, renderSitesSkeleton, setOnScanComplete, resumeInProgressScans } from './js/ui/my-sites.js';
 
     // DOM elements
     const headerRight = document.getElementById('headerRight');
@@ -118,6 +118,10 @@
         const { sites, summary } = await getMySites();
 
         sitesData = sites;
+
+        // Resume polling for any in-progress scans BEFORE rendering
+        // so the initial render shows the scanning state correctly
+        resumeInProgressScans(sites);
 
         renderSitesSummary(summaryContainer, summary);
         renderUI();

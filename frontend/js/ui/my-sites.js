@@ -18,6 +18,37 @@ export function setOnScanComplete(callback) {
 }
 
 /**
+ * Resume tracking any in-progress scans from the sites data.
+ * Called on page load to pick up scans that were running before a refresh.
+ */
+export function resumeInProgressScans(sites) {
+  for (const site of sites) {
+    if (site.latest_scan && ['crawling', 'analyzing', 'crawled'].includes(site.latest_scan.status)) {
+      const siteUrl = site.web_url;
+      const scan = site.latest_scan;
+
+      // Already tracking this scan
+      if (activeScans.has(siteUrl)) continue;
+
+      console.log(`Resuming in-progress scan for ${site.display_name}: ${scan.status}`);
+
+      // Add to active scans and start polling
+      activeScans.set(siteUrl, {
+        scanId: scan.id,
+        status: scan.status,
+        progress: scan.crawl_progress || 0,
+        totalFiles: scan.total_files || 0,
+        totalFolders: scan.total_folders || 0,
+        totalSize: scan.total_size_bytes || 0,
+      });
+
+      // Start polling to continue the crawl
+      pollScanStatus(siteUrl, scan.id);
+    }
+  }
+}
+
+/**
  * Start a scan for a site (called from button click)
  */
 export async function startSiteScan(siteUrl, siteName) {
