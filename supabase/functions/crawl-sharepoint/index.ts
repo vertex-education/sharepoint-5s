@@ -389,10 +389,43 @@ async function updateScanProgress(
 }
 
 /**
- * Mark the crawl as complete.
+ * Mark the crawl as complete (or failed if all folders errored).
  */
 async function finalizeCrawl(admin: any, scanId: string) {
-  console.log(`Crawl complete for scan ${scanId}`);
+  console.log(`Finalizing crawl for scan ${scanId}`);
+
+  // Check if any queue items succeeded
+  const { count: doneCount } = await admin
+    .from('crawl_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('scan_id', scanId)
+    .eq('status', 'done');
+
+  const { count: errorCount } = await admin
+    .from('crawl_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('scan_id', scanId)
+    .eq('status', 'error');
+
+  // If all folders failed, mark scan as error
+  if ((doneCount || 0) === 0 && (errorCount || 0) > 0) {
+    // Get the first error message
+    const { data: errorItem } = await admin
+      .from('crawl_queue')
+      .select('error_message')
+      .eq('scan_id', scanId)
+      .eq('status', 'error')
+      .limit(1)
+      .single();
+
+    console.error(`All ${errorCount} folders failed for scan ${scanId}`);
+    await admin.from('scans').update({
+      status: 'error',
+      error_message: errorItem?.error_message || 'All folders failed to process',
+      updated_at: new Date().toISOString(),
+    }).eq('id', scanId);
+    return;
+  }
 
   // Get final totals from crawled_files
   const { data: fileCounts } = await admin
@@ -412,6 +445,8 @@ async function finalizeCrawl(admin: any, scanId: string) {
       totalSize += file.size_bytes || 0;
     }
   }
+
+  console.log(`Crawl complete for scan ${scanId}: ${totalFiles} files, ${totalFolders} folders`);
 
   await admin.from('scans').update({
     status: 'crawled',
