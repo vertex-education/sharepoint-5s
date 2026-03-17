@@ -36,11 +36,13 @@ body {
   display: flex;
   align-items: center;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .header__logo-img {
-  height: 36px;
+  height: 64px;
   width: auto;
+  object-fit: contain;
 }
 
 .header__center {
