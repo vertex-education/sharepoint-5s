@@ -13,7 +13,8 @@ import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { graphFetch, graphFetchAllPages, parseSharePointUrl } from '../_shared/graph-client.ts';
 
 // Number of folders to process per function invocation
-const BATCH_SIZE = 50;
+// Keep this low to avoid Edge Function timeout (60s on free tier)
+const BATCH_SIZE = 15;
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);

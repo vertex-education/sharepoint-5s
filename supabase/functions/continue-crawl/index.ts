@@ -11,7 +11,8 @@ import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { graphFetchAllPages } from '../_shared/graph-client.ts';
 
 // Number of folders to process per invocation
-const BATCH_SIZE = 50;
+// Keep this low to avoid Edge Function timeout (60s on free tier)
+const BATCH_SIZE = 15;
 
 interface ContinueRequest {
   scan_id: string;

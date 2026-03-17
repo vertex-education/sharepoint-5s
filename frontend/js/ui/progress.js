@@ -13,6 +13,7 @@ export function renderProgress(container, data) {
   const remainingText = data.remaining ? ` (${data.remaining} folders remaining)` : '';
   const statusLabels = {
     pending: 'Preparing...',
+    starting: 'Starting analysis...',
     crawling: `Crawling... ${data.total_files.toLocaleString()} files found${remainingText}`,
     crawled: 'Crawl complete. Starting analysis...',
     analyzing: 'Analyzing files with AI...',
@@ -20,17 +21,21 @@ export function renderProgress(container, data) {
     error: `Error: ${data.error_message || 'Unknown error'}`,
   };
 
-  const isActive = ['crawling', 'analyzing'].includes(data.status);
+  const isActive = ['starting', 'crawling', 'analyzing'].includes(data.status);
   const isError = data.status === 'error';
   const progress = data.status === 'analyzing' ? 100 : (data.crawl_progress || 0);
+
+  const barClasses = ['progress__bar'];
+  if (isActive) barClasses.push('progress__bar--striped', 'progress__bar--active');
+
+  const barStyle = isError
+    ? `width: ${progress}%; background: linear-gradient(90deg, var(--accent-delete), color-mix(in srgb, var(--accent-delete) 80%, white)); box-shadow: 0 0 10px color-mix(in srgb, var(--accent-delete) 50%, transparent);`
+    : `width: ${progress}%;`;
 
   container.innerHTML = `
     <div class="progress animate-fade-in-up">
       <div class="progress__bar-container">
-        <div
-          class="progress__bar ${isActive ? 'progress__bar--striped' : ''}"
-          style="width: ${progress}%; ${isError ? 'background: var(--accent-delete);' : ''}"
-        ></div>
+        <div class="${barClasses.join(' ')}" style="${barStyle}"></div>
       </div>
       <div class="progress__text">
         <span class="progress__status" style="${isError ? 'color: var(--accent-delete);' : ''}">
