@@ -1,23 +1,30 @@
 /* ═══════════════════════════════════════════════════════
-   5S DESIGN TOKENS — Industrial/Utilitarian System
+   VERTEX EDUCATION DESIGN TOKENS — Clean & Professional
    ═══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* ── Typography ── */
-  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
-  --font-body: 'Barlow Condensed', sans-serif;
+  /* ── Brand Colors ── */
+  --vertex-blue: #003865;
+  --vertex-blue-light: #004a7a;
+  --vertex-gold: #CBA052;
+  --vertex-gold-light: #d4a855;
+  --vertex-gray: #707372;
 
-  --text-xs: 0.6875rem;   /* 11px */
-  --text-sm: 0.8125rem;   /* 13px */
-  --text-base: 0.9375rem; /* 15px */
+  /* ── Typography ── */
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
   --text-lg: 1.125rem;    /* 18px */
   --text-xl: 1.5rem;      /* 24px */
   --text-2xl: 2rem;       /* 32px */
-  --text-3xl: 2.75rem;    /* 44px */
-  --text-4xl: 4rem;       /* 64px */
+  --text-3xl: 2.5rem;     /* 40px */
+  --text-4xl: 3rem;       /* 48px */
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -25,53 +32,57 @@
   --weight-bold: 700;
   --weight-extrabold: 800;
 
-  --leading-tight: 1.1;
+  --leading-tight: 1.2;
   --leading-normal: 1.5;
   --leading-loose: 1.75;
 
   --tracking-tight: -0.02em;
   --tracking-normal: 0;
-  --tracking-wide: 0.05em;
-  --tracking-wider: 0.12em;
+  --tracking-wide: 0.02em;
 
-  /* ── Colors — Factory Floor ── */
-  --bg-primary: #111113;
-  --bg-surface: #1a1a1e;
-  --bg-elevated: #222228;
-  --bg-hover: #2a2a32;
-  --bg-input: #16161a;
+  /* ── Colors — Light Theme ── */
+  --bg-primary: #f8f9fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f0f1f3;
+  --bg-input: #ffffff;
 
-  --border-subtle: #2a2a32;
-  --border-default: #3a3a44;
-  --border-strong: #4a4a56;
+  --border-subtle: #e9ecef;
+  --border-default: #dee2e6;
+  --border-strong: #ced4da;
 
-  --text-primary: #e8e4dd;
-  --text-secondary: #9d9a93;
-  --text-tertiary: #6b6860;
-  --text-inverse: #111113;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-tertiary: #adb5bd;
+  --text-inverse: #ffffff;
 
-  /* ── Category Colors ── */
-  --accent-delete: #e63946;
-  --accent-delete-dim: #e6394620;
-  --accent-delete-glow: #e6394640;
+  /* ── Category Colors (Tier-based) ── */
+  --accent-delete: #dc3545;
+  --accent-delete-dim: #dc354510;
+  --accent-delete-glow: #dc354530;
 
-  --accent-archive: #e9a820;
-  --accent-archive-dim: #e9a82020;
-  --accent-archive-glow: #e9a82040;
+  --accent-archive: var(--vertex-gold);
+  --accent-archive-dim: #CBA05215;
+  --accent-archive-glow: #CBA05235;
 
-  --accent-rename: #457b9d;
-  --accent-rename-dim: #457b9d20;
-  --accent-rename-glow: #457b9d40;
+  --accent-rename: var(--vertex-blue);
+  --accent-rename-dim: #00386510;
+  --accent-rename-glow: #00386530;
 
-  --accent-structure: #8b7ec8;
-  --accent-structure-dim: #8b7ec820;
-  --accent-structure-glow: #8b7ec840;
+  --accent-structure: #6f42c1;
+  --accent-structure-dim: #6f42c110;
+  --accent-structure-glow: #6f42c130;
 
   /* ── Action Colors ── */
-  --accent-approve: #2a9d8f;
-  --accent-approve-dim: #2a9d8f20;
-  --accent-reject: #e63946;
-  --accent-reject-dim: #e6394620;
+  --accent-approve: #2DA44A;
+  --accent-approve-dim: #2DA44A15;
+  --accent-reject: #dc3545;
+  --accent-reject-dim: #dc354515;
+
+  /* ── Tier Colors ── */
+  --tier-1: #dc3545;
+  --tier-2: #fd7e14;
+  --tier-3: #17a2b8;
 
   /* ── Utility ── */
   --white: #ffffff;
@@ -91,19 +102,21 @@
   --space-20: 5rem;     /* 80px */
 
   /* ── Radii ── */
-  --radius-sm: 3px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-full: 9999px;
 
   /* ── Shadows ── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow-delete: 0 0 20px var(--accent-delete-glow);
-  --shadow-glow-archive: 0 0 20px var(--accent-archive-glow);
-  --shadow-glow-rename: 0 0 20px var(--accent-rename-glow);
-  --shadow-glow-structure: 0 0 20px var(--accent-structure-glow);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 12px 35px rgba(0, 56, 101, 0.15);
+  --shadow-glow-delete: 0 0 15px var(--accent-delete-glow);
+  --shadow-glow-archive: 0 0 15px var(--accent-archive-glow);
+  --shadow-glow-rename: 0 0 15px var(--accent-rename-glow);
+  --shadow-glow-structure: 0 0 15px var(--accent-structure-glow);
 
   /* ── Transitions ── */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -120,13 +133,18 @@
   --z-modal: 1000;
   --z-toast: 2000;
 
+  /* ── Gradients ── */
+  --gradient-hero: linear-gradient(135deg, var(--vertex-blue) 0%, var(--vertex-blue-light) 100%);
+  --gradient-gold: linear-gradient(135deg, var(--vertex-gold) 0%, var(--vertex-gold-light) 100%);
+  --gradient-subtle: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+
   /* ── Hazard Stripe (decorative) ── */
   --hazard-stripe: repeating-linear-gradient(
     -45deg,
-    var(--accent-archive) 0px,
-    var(--accent-archive) 8px,
-    var(--bg-primary) 8px,
-    var(--bg-primary) 16px
+    var(--vertex-gold) 0px,
+    var(--vertex-gold) 8px,
+    var(--vertex-gold-light) 8px,
+    var(--vertex-gold-light) 16px
   );
 
   --hazard-stripe-subtle: repeating-linear-gradient(

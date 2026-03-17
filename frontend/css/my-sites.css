@@ -5,21 +5,19 @@
 /* Hero Section */
 .my-sites__hero {
   text-align: center;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
 .my-sites__title {
   font-family: var(--font-display);
-  font-weight: var(--weight-extrabold);
-  font-size: var(--text-2xl);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xl);
+  color: var(--vertex-blue);
   margin-bottom: var(--space-2);
 }
 
 .my-sites__subtitle {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--text-secondary);
 }
 
@@ -54,22 +52,24 @@
 
 /* Site Card */
 .site-card {
-  background: var(--bg-surface);
+  background: var(--white);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   transition: all var(--duration-normal) var(--ease-out);
+  box-shadow: var(--shadow-sm);
 }
 
 .site-card:hover {
-  border-color: var(--border-default);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
 }
 
 .site-card--scanned {
-  border-left: 3px solid var(--accent-approve);
+  border-left: 4px solid var(--accent-approve);
 }
 
 /* Card Header */
@@ -80,15 +80,16 @@
 }
 
 .site-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--text-lg);
   flex-shrink: 0;
+  color: var(--vertex-blue);
 }
 
 .site-card--scanned .site-card__icon {
@@ -98,10 +99,9 @@
 
 .site-card__name {
   font-family: var(--font-display);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-base);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -135,14 +135,13 @@
   font-family: var(--font-display);
   font-weight: var(--weight-bold);
   font-size: var(--text-lg);
+  color: var(--vertex-blue);
   display: block;
 }
 
 .site-card__stat-label {
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 /* Card Breakdown Tags */
@@ -266,11 +265,11 @@
    ═══════════════════════════════════════════════════════ */
 
 .site-card--scanning {
-  border-left: 3px solid var(--accent-archive);
+  border-left: 4px solid var(--vertex-gold);
   background: linear-gradient(
     135deg,
-    var(--bg-surface) 0%,
-    color-mix(in srgb, var(--accent-archive) 5%, var(--bg-surface)) 100%
+    var(--white) 0%,
+    color-mix(in srgb, var(--vertex-gold) 5%, var(--white)) 100%
   );
 }
 
@@ -296,11 +295,11 @@
 
 .scan-progress__bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-archive), color-mix(in srgb, var(--accent-archive) 80%, white));
+  background: linear-gradient(90deg, var(--vertex-gold), var(--vertex-gold-light));
   border-radius: var(--radius-full);
   transition: width var(--duration-normal) var(--ease-out);
   position: relative;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-archive) 40%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--vertex-gold) 40%, transparent);
   animation: scan-glow 1.5s ease-in-out infinite;
 }
 
@@ -325,8 +324,8 @@
 }
 
 @keyframes scan-glow {
-  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-archive) 40%, transparent); }
-  50% { box-shadow: 0 0 16px color-mix(in srgb, var(--accent-archive) 60%, transparent); }
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--vertex-gold) 40%, transparent); }
+  50% { box-shadow: 0 0 16px color-mix(in srgb, var(--vertex-gold) 60%, transparent); }
 }
 
 .scan-progress__text {
