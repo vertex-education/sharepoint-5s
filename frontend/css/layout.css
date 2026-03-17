@@ -33,15 +33,14 @@ body {
 }
 
 .header__logo {
-  font-family: var(--font-display);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-xl);
-  color: var(--white);
+  display: flex;
+  align-items: center;
   text-decoration: none;
 }
 
-.header__logo span {
-  color: var(--vertex-gold);
+.header__logo-img {
+  height: 36px;
+  width: auto;
 }
 
 .header__center {
