@@ -60,19 +60,47 @@ serve(async (req: Request) => {
       );
     }
 
-    // Get the drive ID from the first scan
+    // Get the site_id from the scan to resolve drives
     const { data: scanData } = await admin
       .from('scans')
-      .select('drive_id')
+      .select('site_id, drive_id')
       .eq('id', validSuggestions[0].scan_id)
       .single();
 
-    const driveId = scanData?.drive_id;
-    if (!driveId) {
+    if (!scanData?.drive_id && !scanData?.site_id) {
       return new Response(
-        JSON.stringify({ error: 'Drive ID not found for scan' }),
+        JSON.stringify({ error: 'Drive/Site ID not found for scan' }),
         { status: 500, headers: { ...corsHeaders(req), 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Build a map of drive name → drive ID by fetching all drives for the site
+    const driveNameMap = new Map<string, string>();
+    const fallbackDriveId = scanData.drive_id;
+
+    if (scanData.site_id) {
+      try {
+        const drivesData = await graphFetch(userId, `/sites/${scanData.site_id}/drives`);
+        for (const d of (drivesData.value || [])) {
+          driveNameMap.set(d.name.toLowerCase(), d.id);
+        }
+      } catch (err) {
+        console.warn('Could not fetch drives for site, using fallback driveId:', err.message);
+      }
+    }
+
+    // Helper: resolve the driveId for a file based on its path
+    function resolveDriveId(filePath: string): string {
+      // Path format: /DriveName/folder/file.ext
+      if (filePath && filePath.startsWith('/')) {
+        const parts = filePath.split('/').filter(Boolean);
+        if (parts.length > 0) {
+          const driveName = parts[0].toLowerCase();
+          const mapped = driveNameMap.get(driveName);
+          if (mapped) return mapped;
+        }
+      }
+      return fallbackDriveId;
     }
 
     // Execute each action sequentially
@@ -96,18 +124,16 @@ serve(async (req: Request) => {
       let errorMessage: string | null = null;
 
       try {
+        const fileDriveId = resolveDriveId(file.path);
+
         switch (suggestion.category) {
           case 'delete': {
             actionType = 'delete';
             graphResponse = await graphFetch(
               userId,
-              `/drives/${driveId}/items/${file.graph_item_id}`,
+              `/drives/${fileDriveId}/items/${file.graph_item_id}`,
               { method: 'DELETE' }
-            ).catch(async (err) => {
-              // DELETE returns 204 No Content on success
-              if (err.message.includes('204')) return { status: 'deleted' };
-              throw err;
-            });
+            );
             break;
           }
 
@@ -119,7 +145,7 @@ serve(async (req: Request) => {
             payload = { name: suggestion.suggested_value };
             graphResponse = await graphFetch(
               userId,
-              `/drives/${driveId}/items/${file.graph_item_id}`,
+              `/drives/${fileDriveId}/items/${file.graph_item_id}`,
               {
                 method: 'PATCH',
                 body: JSON.stringify(payload),
@@ -169,9 +195,9 @@ serve(async (req: Request) => {
         error_message: errorMessage,
       });
 
-      // Update suggestion decision
+      // Update suggestion decision — mark as 'executed' on success so the UI knows it's done
       await admin.from('suggestions').update({
-        user_decision: status === 'success' ? 'approved' : 'pending',
+        user_decision: status === 'success' ? 'executed' : 'approved',
         decided_at: new Date().toISOString(),
       }).eq('id', suggestion.id);
 

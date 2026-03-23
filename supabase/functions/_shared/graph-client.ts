@@ -132,7 +132,17 @@ export async function graphFetch(
     throw new Error(`Graph API error ${response.status}: ${errBody}`);
   }
 
-  return response.json();
+  // Handle 204 No Content (e.g., DELETE success) and other empty responses
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return { _status: 204 };
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return { _status: response.status };
+  }
+
+  return JSON.parse(text);
 }
 
 /**

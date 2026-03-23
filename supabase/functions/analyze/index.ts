@@ -10,7 +10,7 @@ import { verifyAuth } from '../_shared/auth.ts';
 import { getAdminClient } from '../_shared/supabase-admin.ts';
 import { analyzeFiles, ANALYSIS_SYSTEM_PROMPT, isGroqAvailable } from '../_shared/groq.ts';
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 50;
 const TWO_YEARS_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
 const FOUR_YEARS_MS = 4 * 365.25 * 24 * 60 * 60 * 1000;
 
@@ -411,31 +411,23 @@ serve(async (req: Request) => {
       }
     }
 
+    // Tag all rules-engine suggestions
+    for (const s of suggestions) {
+      s.source = 'rules';
+    }
+
     // ─── Phase 2: Groq AI Analysis (only for uncaught files) ───
 
     if (isGroqAvailable()) {
       // Filter to only files NOT already matched by rules
       const uncaughtFiles = files.filter((f: any) => !rulesMatchedFileIds.has(f.id));
+      console.log(`AI analysis: ${uncaughtFiles.length} uncaught files out of ${files.length} total`);
 
       if (uncaughtFiles.length > 0) {
-        // Group by top-level folder for chunked analysis
-        const filesByTopFolder = new Map<string, any[]>();
-        for (const file of uncaughtFiles) {
-          const topFolder = file.path.split('/').filter(Boolean)[0] || 'root';
-          if (!filesByTopFolder.has(topFolder)) filesByTopFolder.set(topFolder, []);
-          filesByTopFolder.get(topFolder)!.push(file);
-        }
-
-        // Build chunks
+        // Build chunks of BATCH_SIZE files each
         const chunks: any[][] = [];
-        let currentChunk: any[] = [];
-
-        for (const [, folderFiles] of filesByTopFolder) {
-          if (currentChunk.length + folderFiles.length > BATCH_SIZE && currentChunk.length > 0) {
-            chunks.push(currentChunk);
-            currentChunk = [];
-          }
-          currentChunk.push(...folderFiles.map((f: any) => ({
+        for (let i = 0; i < uncaughtFiles.length; i += BATCH_SIZE) {
+          chunks.push(uncaughtFiles.slice(i, i + BATCH_SIZE).map((f: any) => ({
             path: f.path,
             name: f.name,
             extension: f.file_extension,
@@ -449,39 +441,52 @@ serve(async (req: Request) => {
           })));
         }
 
-        if (currentChunk.length > 0) chunks.push(currentChunk);
+        console.log(`AI analysis: processing ${chunks.length} chunks of ~${BATCH_SIZE} files each`);
 
-        // Run Groq on each chunk
-        for (const chunk of chunks) {
-          try {
-            const aiSuggestions = await analyzeFiles(
-              {
-                total_files: files.filter((f: any) => !f.is_folder).length,
-                total_folders: files.filter((f: any) => f.is_folder).length,
-                uncaught_count: uncaughtFiles.length,
-                rules_matched_count: rulesMatchedFileIds.size,
-                files: chunk,
-              },
-              ANALYSIS_SYSTEM_PROMPT
-            );
+        // Run chunks with concurrency limit of 3 to avoid timeout
+        const CONCURRENCY = 3;
+        const totalFiles = files.filter((f: any) => !f.is_folder).length;
+        const totalFolders = files.filter((f: any) => f.is_folder).length;
 
-            for (const s of aiSuggestions) {
-              const matchedFile = files.find((f: any) => f.path === s.file_path);
-              suggestions.push({
-                scan_id,
-                file_id: matchedFile?.id || null,
-                category: s.category,
-                severity: s.severity,
-                title: s.title,
-                description: s.description,
-                current_value: s.file_path,
-                suggested_value: s.suggested_value,
-                confidence: s.confidence,
-              });
+        for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+          const batch = chunks.slice(i, i + CONCURRENCY);
+          const results = await Promise.allSettled(
+            batch.map((chunk, idx) => {
+              console.log(`AI chunk ${i + idx + 1}/${chunks.length}: ${chunk.length} files`);
+              return analyzeFiles(
+                {
+                  total_files: totalFiles,
+                  total_folders: totalFolders,
+                  uncaught_count: uncaughtFiles.length,
+                  rules_matched_count: rulesMatchedFileIds.size,
+                  files: chunk,
+                },
+                ANALYSIS_SYSTEM_PROMPT
+              );
+            })
+          );
+
+          for (const result of results) {
+            if (result.status === 'fulfilled') {
+              console.log(`AI chunk returned ${result.value.length} suggestions`);
+              for (const s of result.value) {
+                const matchedFile = files.find((f: any) => f.path === s.file_path);
+                suggestions.push({
+                  scan_id,
+                  file_id: matchedFile?.id || null,
+                  category: s.category,
+                  severity: s.severity,
+                  title: s.title,
+                  description: s.description,
+                  current_value: s.file_path,
+                  suggested_value: s.suggested_value,
+                  confidence: s.confidence,
+                  source: 'ai',
+                });
+              }
+            } else {
+              console.error('Groq analysis error for chunk:', result.reason);
             }
-          } catch (aiErr) {
-            console.error('Groq analysis error for chunk:', aiErr);
-            // Continue — rules-only results are still valuable
           }
         }
       }

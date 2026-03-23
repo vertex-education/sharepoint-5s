@@ -47,7 +47,7 @@ export async function analyzeFiles(
       model: GROQ_MODEL,
       response_format: { type: 'json_object' },
       temperature: 0.3,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: JSON.stringify(fileData) },

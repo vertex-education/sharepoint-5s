@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — SharePoint 5S</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <a href="index.html" class="header__logo">
+        <img src="assets/vertex-white.png" alt="Vertex Education" class="header__logo-img">
+      </a>
+      <nav class="header__nav" id="headerNav">
+        <a href="index.html" class="header__nav-link">Scan</a>
+        <a href="my-sites.html" class="header__nav-link">My Sites</a>
+        <a href="leaderboard.html" class="header__nav-link">Leaderboard</a>
+        <a href="admin.html" class="header__nav-link header__nav-link--active">Admin</a>
+      </nav>
+      <div class="header__right" id="headerRight"></div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="admin-page">
+        <!-- Access Denied (shown if not admin) -->
+        <div id="accessDenied" class="access-denied" style="display:none;">
+          <div class="access-denied__icon">🔒</div>
+          <h2 class="access-denied__title">Access Denied</h2>
+          <p class="access-denied__text">You don't have admin privileges.</p>
+          <a href="my-sites.html" class="btn btn--primary">Go to My Sites</a>
+        </div>
+
+        <!-- Admin Content (shown if admin) -->
+        <div id="adminContent" style="display:none;">
+          <div class="admin-header">
+            <h1 class="admin-title">Admin Dashboard</h1>
+            <p class="admin-subtitle">Manage admins and pre-scan large folders</p>
+          </div>
+
+          <!-- Admin Management Section -->
+          <section class="admin-section">
+            <h2 class="admin-section__title">Manage Admins</h2>
+            <div class="admin-form">
+              <div class="input-group">
+                <input type="email" id="newAdminEmail" class="input" placeholder="Enter email address">
+                <button class="btn btn--primary" id="addAdminBtn">Add Admin</button>
+              </div>
+            </div>
+            <div id="adminList" class="admin-list">
+              <!-- Populated by JS -->
+            </div>
+          </section>
+
+          <!-- Pre-scan Section -->
+          <section class="admin-section">
+            <h2 class="admin-section__title">Pre-scan Large Folders</h2>
+            <p class="admin-section__description">
+              Scan folders larger than 1GB ahead of time so users don't have to wait.
+            </p>
+
+            <div class="prescan-controls">
+              <div class="input-group">
+                <input type="text" id="prescanSiteUrl" class="input" placeholder="SharePoint site or library URL">
+                <button class="btn btn--primary" id="scanForLargeFoldersBtn">Find Large Folders</button>
+              </div>
+            </div>
+
+            <div id="largeFoldersList" class="large-folders-list">
+              <!-- Populated by JS -->
+            </div>
+          </section>
+
+          <!-- Pre-scan Queue Section -->
+          <section class="admin-section">
+            <h2 class="admin-section__title">Pre-scan Queue</h2>
+            <div id="prescanQueue" class="prescan-queue">
+              <!-- Populated by JS -->
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/pages/admin.js"></script>
+</body>
+</html>
