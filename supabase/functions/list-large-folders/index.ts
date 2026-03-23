@@ -5,8 +5,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getAuthenticatedUser, getAccessToken } from '../_shared/auth.ts';
-import { createGraphClient } from '../_shared/graph-client.ts';
+import { verifyAuth } from '../_shared/auth.ts';
+import { graphFetch } from '../_shared/graph-client.ts';
 
 const MIN_SIZE_BYTES = 1024 * 1024 * 1024; // 1GB default
 
@@ -38,22 +38,7 @@ serve(async (req) => {
 
   try {
     // Authenticate user
-    const user = await getAuthenticatedUser(req);
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get access token
-    const accessToken = await getAccessToken(user.id);
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'No Microsoft token found' }), {
-        status: 401,
-        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
-      });
-    }
+    const { userId } = await verifyAuth(req);
 
     const { url, minSizeGB = 1 } = await req.json();
     const minSizeBytes = minSizeGB * 1024 * 1024 * 1024;
@@ -67,10 +52,8 @@ serve(async (req) => {
       });
     }
 
-    const graph = createGraphClient(accessToken);
-
     // Get site and drive info
-    const siteInfo = await getSiteInfo(graph, parsedUrl);
+    const siteInfo = await getSiteInfo(userId, parsedUrl);
     if (!siteInfo) {
       return new Response(JSON.stringify({ error: 'Could not access SharePoint site' }), {
         status: 400,
@@ -79,7 +62,7 @@ serve(async (req) => {
     }
 
     // Find large folders (exclude Teams channel folders if Teams site)
-    const folders = await findLargeFolders(graph, siteInfo.driveId, minSizeBytes, siteInfo.isTeamsSite);
+    const folders = await findLargeFolders(userId, siteInfo.driveId, minSizeBytes, siteInfo.isTeamsSite);
 
     return new Response(JSON.stringify({
       folders,
@@ -111,8 +94,9 @@ function parseSharePointUrl(url: string) {
     }
 
     // Extract site path
-    const pathMatch = urlObj.pathname.match(/\/sites\/([^\/]+)/i);
-    const sitePath = pathMatch ? `/sites/${pathMatch[1]}` : null;
+    const pathMatch = urlObj.pathname.match(/\/sites\/([^\/]+)/i) ||
+                      urlObj.pathname.match(/\/teams\/([^\/]+)/i);
+    const sitePath = pathMatch ? `/${pathMatch[0].split('/')[1]}/${pathMatch[1]}` : null;
 
     // Extract library name if present
     const libMatch = urlObj.pathname.match(/\/([^\/]+)\/Forms\/AllItems\.aspx/i) ||
@@ -129,10 +113,10 @@ function parseSharePointUrl(url: string) {
   }
 }
 
-async function getSiteInfo(graph: any, parsed: any) {
+async function getSiteInfo(userId: string, parsed: any) {
   try {
     // Get site
-    const siteResponse = await graph.api(`/sites/${parsed.hostname}:${parsed.sitePath}`).get();
+    const siteResponse = await graphFetch(userId, `/sites/${parsed.hostname}:${parsed.sitePath}`);
     const siteId = siteResponse.id;
     const siteName = siteResponse.displayName;
 
@@ -142,7 +126,7 @@ async function getSiteInfo(graph: any, parsed: any) {
       siteResponse.root?.webTemplate === 'GROUP#0';
 
     // Get drives
-    const drivesResponse = await graph.api(`/sites/${siteId}/drives`).get();
+    const drivesResponse = await graphFetch(userId, `/sites/${siteId}/drives`);
     const drives = drivesResponse.value;
 
     // Find the right drive
@@ -165,7 +149,7 @@ async function getSiteInfo(graph: any, parsed: any) {
   }
 }
 
-async function findLargeFolders(graph: any, driveId: string, minSizeBytes: number, isTeamsSite: boolean = false) {
+async function findLargeFolders(userId: string, driveId: string, minSizeBytes: number, isTeamsSite: boolean = false) {
   const largeFolders: any[] = [];
 
   // Helper to check if a folder should be skipped
@@ -187,11 +171,10 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
   };
 
   // Get root children
-  const rootResponse = await graph
-    .api(`/drives/${driveId}/root/children`)
-    .select('id,name,size,folder,parentReference')
-    .top(100)
-    .get();
+  const rootResponse = await graphFetch(
+    userId,
+    `/drives/${driveId}/root/children?$select=id,name,size,folder,parentReference&$top=100`
+  );
 
   // Check each folder
   for (const item of rootResponse.value) {
@@ -201,7 +184,7 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
         continue;
       }
 
-      const folderSize = await getFolderSize(graph, driveId, item.id);
+      const folderSize = await getFolderSize(userId, driveId, item.id);
       if (folderSize >= minSizeBytes) {
         largeFolders.push({
           id: item.id,
@@ -213,11 +196,10 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
 
       // Also check immediate subfolders
       try {
-        const subResponse = await graph
-          .api(`/drives/${driveId}/items/${item.id}/children`)
-          .select('id,name,size,folder,parentReference')
-          .top(50)
-          .get();
+        const subResponse = await graphFetch(
+          userId,
+          `/drives/${driveId}/items/${item.id}/children?$select=id,name,size,folder,parentReference&$top=50`
+        );
 
         for (const subItem of subResponse.value) {
           if (subItem.folder) {
@@ -226,7 +208,7 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
               continue;
             }
 
-            const subSize = await getFolderSize(graph, driveId, subItem.id);
+            const subSize = await getFolderSize(userId, driveId, subItem.id);
             if (subSize >= minSizeBytes) {
               largeFolders.push({
                 id: subItem.id,
@@ -249,13 +231,13 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
   return largeFolders;
 }
 
-async function getFolderSize(graph: any, driveId: string, folderId: string): Promise<number> {
+async function getFolderSize(userId: string, driveId: string, folderId: string): Promise<number> {
   try {
     // Get folder details which includes size
-    const folderInfo = await graph
-      .api(`/drives/${driveId}/items/${folderId}`)
-      .select('size,folder')
-      .get();
+    const folderInfo = await graphFetch(
+      userId,
+      `/drives/${driveId}/items/${folderId}?$select=size,folder`
+    );
 
     // The size property on a folder represents the total size of contents
     return folderInfo.size || 0;

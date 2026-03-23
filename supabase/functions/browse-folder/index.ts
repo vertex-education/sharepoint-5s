@@ -5,8 +5,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
-import { getAuthenticatedUser, getAccessToken } from '../_shared/auth.ts';
-import { createGraphClient, parseSharePointUrl } from '../_shared/graph-client.ts';
+import { verifyAuth } from '../_shared/auth.ts';
+import { graphFetch, parseSharePointUrl } from '../_shared/graph-client.ts';
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -15,22 +15,7 @@ serve(async (req) => {
 
   try {
     // Authenticate user
-    const user = await getAuthenticatedUser(req);
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get access token
-    const accessToken = await getAccessToken(user.id);
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'No Microsoft token found' }), {
-        status: 401,
-        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
-      });
-    }
+    const { userId } = await verifyAuth(req);
 
     const { url, path } = await req.json();
 
@@ -41,19 +26,11 @@ serve(async (req) => {
       });
     }
 
-    const graph = createGraphClient(accessToken);
-
     // Parse the SharePoint URL
     const parsed = parseSharePointUrl(url);
-    if (!parsed) {
-      return new Response(JSON.stringify({ error: 'Invalid SharePoint URL' }), {
-        status: 400,
-        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
-      });
-    }
 
     // Get site info
-    const siteInfo = await getSiteAndDrive(graph, parsed.hostname, parsed.sitePath, parsed.libraryPath);
+    const siteInfo = await getSiteAndDrive(userId, parsed.hostname, parsed.sitePath, parsed.libraryPath);
     if (!siteInfo) {
       return new Response(JSON.stringify({ error: 'Could not access SharePoint site' }), {
         status: 400,
@@ -63,7 +40,7 @@ serve(async (req) => {
 
     // Get folder contents
     const folderPath = path || '';
-    const contents = await getFolderContents(graph, siteInfo.driveId, folderPath);
+    const contents = await getFolderContents(userId, siteInfo.driveId, folderPath);
 
     return new Response(JSON.stringify({
       site: {
@@ -86,15 +63,15 @@ serve(async (req) => {
   }
 });
 
-async function getSiteAndDrive(graph: any, hostname: string, sitePath: string, libraryHint?: string) {
+async function getSiteAndDrive(userId: string, hostname: string, sitePath: string, libraryHint?: string | null) {
   try {
     // Get site
-    const siteResponse = await graph.api(`/sites/${hostname}:${sitePath}`).get();
+    const siteResponse = await graphFetch(userId, `/sites/${hostname}:${sitePath}`);
     const siteId = siteResponse.id;
     const siteName = siteResponse.displayName;
 
     // Get drives
-    const drivesResponse = await graph.api(`/sites/${siteId}/drives`).get();
+    const drivesResponse = await graphFetch(userId, `/sites/${siteId}/drives`);
     const drives = drivesResponse.value;
 
     // Find the right drive
@@ -116,18 +93,13 @@ async function getSiteAndDrive(graph: any, hostname: string, sitePath: string, l
   }
 }
 
-async function getFolderContents(graph: any, driveId: string, folderPath: string) {
+async function getFolderContents(userId: string, driveId: string, folderPath: string) {
   try {
     const endpoint = folderPath
-      ? `/drives/${driveId}/root:/${encodeURIComponent(folderPath)}:/children`
-      : `/drives/${driveId}/root/children`;
+      ? `/drives/${driveId}/root:/${encodeURIComponent(folderPath)}:/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`
+      : `/drives/${driveId}/root/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`;
 
-    const response = await graph
-      .api(endpoint)
-      .select('id,name,size,folder,file,webUrl,lastModifiedDateTime')
-      .orderby('name')
-      .top(200)
-      .get();
+    const response = await graphFetch(userId, endpoint);
 
     return response.value.map((item: any) => ({
       id: item.id,
