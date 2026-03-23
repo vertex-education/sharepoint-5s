@@ -1,4 +1,7 @@
 -- Add points to leaderboard (1 action = 15 points)
+-- Must drop first since we're adding a new column to the return type
+
+DROP FUNCTION IF EXISTS get_leaderboard_stats();
 
 CREATE OR REPLACE FUNCTION get_leaderboard_stats()
 RETURNS TABLE (
