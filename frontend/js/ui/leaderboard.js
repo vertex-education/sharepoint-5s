@@ -9,6 +9,7 @@
  * @param {{ total_users: number, total_actions: number, total_bytes_cleaned: number }} aggregates
  */
 export function renderAggregates(container, aggregates) {
+  const totalPoints = (aggregates.total_actions * 15).toLocaleString();
   container.innerHTML = `
     <div class="aggregate-stats">
       <div class="stat-card stat-card--large animate-fade-in-up stagger-1">
@@ -16,8 +17,8 @@ export function renderAggregates(container, aggregates) {
         <div class="stat-card__label">Contributors</div>
       </div>
       <div class="stat-card stat-card--large stat-card--archive animate-fade-in-up stagger-2">
-        <div class="stat-card__value">${aggregates.total_actions.toLocaleString()}</div>
-        <div class="stat-card__label">Total Actions</div>
+        <div class="stat-card__value">${totalPoints}</div>
+        <div class="stat-card__label">Total Points</div>
       </div>
       <div class="stat-card stat-card--large animate-fade-in-up stagger-3">
         <div class="stat-card__value">${formatBytes(aggregates.total_bytes_cleaned)}</div>
@@ -60,6 +61,7 @@ function renderLeaderboardRow(entry, index, currentUserId) {
   const rankClass = getRankClass(entry.rank);
   const avatarColor = getAvatarColor(entry.rank);
   const staggerClass = Math.min(index + 1, 10);
+  const points = entry.points || (entry.total_actions * 15);
 
   return `
     <div class="leaderboard-row ${isCurrentUser ? 'leaderboard-row--current' : ''} animate-fade-in-up stagger-${staggerClass}">
@@ -73,6 +75,10 @@ function renderLeaderboardRow(entry, index, currentUserId) {
         <span class="leaderboard-row__name">${escapeHtml(entry.display_name)}</span>
         ${isCurrentUser ? '<span class="badge">You</span>' : ''}
       </div>
+      <div class="leaderboard-row__points">
+        <span class="leaderboard-row__points-value">${points.toLocaleString()}</span>
+        <span class="leaderboard-row__points-label">pts</span>
+      </div>
       <div class="leaderboard-row__stats">
         <div class="leaderboard-row__stat">
           <span class="leaderboard-row__stat-value">${entry.total_actions}</span>
@@ -81,10 +87,6 @@ function renderLeaderboardRow(entry, index, currentUserId) {
         <div class="leaderboard-row__stat leaderboard-row__stat--delete">
           <span class="leaderboard-row__stat-value">${entry.total_deletes}</span>
           <span class="leaderboard-row__stat-label">Deleted</span>
-        </div>
-        <div class="leaderboard-row__stat leaderboard-row__stat--rename">
-          <span class="leaderboard-row__stat-value">${entry.total_renames}</span>
-          <span class="leaderboard-row__stat-label">Renamed</span>
         </div>
         <div class="leaderboard-row__stat">
           <span class="leaderboard-row__stat-value">${formatBytes(entry.bytes_deleted)}</span>

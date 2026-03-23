@@ -10,15 +10,14 @@
 
 .leaderboard__title {
   font-family: var(--font-display);
-  font-weight: var(--weight-extrabold);
-  font-size: var(--text-3xl);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-2xl);
+  color: var(--vertex-blue);
   margin-bottom: var(--space-6);
 }
 
 .leaderboard__title span {
-  color: var(--accent-archive);
+  color: var(--vertex-gold);
 }
 
 /* Aggregate Stats */
@@ -49,23 +48,47 @@
 
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 60px 1fr 2fr;
+  grid-template-columns: 60px 1fr auto 2fr;
   gap: var(--space-4);
   align-items: center;
   padding: var(--space-4) var(--space-5);
-  background: var(--bg-surface);
+  background: var(--white);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
 .leaderboard-row:hover {
-  border-color: var(--border-default);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .leaderboard-row--current {
-  border-color: var(--accent-archive);
+  border-color: var(--vertex-gold);
   background: var(--accent-archive-dim);
+}
+
+/* Points Display */
+.leaderboard-row__points {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--gradient-gold);
+  border-radius: var(--radius-md);
+  color: var(--white);
+}
+
+.leaderboard-row__points-value {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-lg);
+}
+
+.leaderboard-row__points-label {
+  font-size: var(--text-xs);
+  opacity: 0.9;
 }
 
 /* Rank */
@@ -168,7 +191,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .leaderboard-row {
-    grid-template-columns: 50px 1fr;
+    grid-template-columns: 50px 1fr auto;
     grid-template-rows: auto auto;
   }
 
@@ -182,6 +205,14 @@
 
   .leaderboard-row__stat {
     min-width: 50px;
+  }
+
+  .leaderboard-row__points {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .leaderboard-row__points-value {
+    font-size: var(--text-base);
   }
 }
 

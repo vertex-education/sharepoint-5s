@@ -268,6 +268,17 @@
   white-space: nowrap;
 }
 
+.suggestion-card__link {
+  color: var(--vertex-blue);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.suggestion-card__link:hover {
+  color: var(--vertex-gold);
+  text-decoration: underline;
+}
+
 .suggestion-card__description {
   grid-column: 1 / -1;
   font-size: var(--text-sm);

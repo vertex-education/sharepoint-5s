@@ -44,7 +44,9 @@ export function createSuggestionCard(suggestion, { onApprove, onReject }) {
         </span>
       </div>
       <div class="suggestion-card__path" title="${escapeHtml(suggestion.current_value || '')}">
-        ${escapeHtml(suggestion.current_value || file?.path || '')}
+        ${file?.web_url
+          ? `<a href="${escapeHtml(file.web_url)}" target="_blank" rel="noopener" class="suggestion-card__link">${escapeHtml(suggestion.current_value || file?.path || '')}</a>`
+          : escapeHtml(suggestion.current_value || file?.path || '')}
       </div>
     </div>
     <div></div>
