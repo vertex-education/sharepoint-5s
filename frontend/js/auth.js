@@ -162,3 +162,23 @@ function getInitials(name) {
     .map(s => s[0].toUpperCase())
     .join('');
 }
+
+/**
+ * Require authentication - redirect to sign in if not authenticated.
+ */
+export async function requireAuth() {
+  await initAuth();
+  if (!isSignedIn()) {
+    sessionStorage.setItem('redirect_after_auth', window.location.href);
+    await signIn('/callback.html');
+    // This won't execute since signIn redirects
+    throw new Error('Redirecting to sign in');
+  }
+}
+
+/**
+ * Get current user object.
+ */
+export function getCurrentUser() {
+  return currentUser;
+}

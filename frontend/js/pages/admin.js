@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase-client.js';
-import { initAuth, requireAuth, getCurrentUser } from '../lib/auth.js';
+import { initAuth, requireAuth, getCurrentUser } from '../auth.js';
 import { callEdgeFunction } from '../api.js';
 
 // DOM Elements
