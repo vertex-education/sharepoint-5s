@@ -48,7 +48,7 @@
             type="url"
             class="input"
             id="sharepointUrl"
-            placeholder="https://tenant.sharepoint.com/sites/YourSite"
+            placeholder="https://tenant.sharepoint.com/sites/YourSite/Folder"
             autocomplete="url"
             spellcheck="false"
             aria-label="SharePoint URL"
@@ -58,9 +58,20 @@
           </button>
         </div>
         <p class="input__hint animate-fade-in stagger-6" id="inputHint">
-          Paste any SharePoint site or document library URL
+          Paste any SharePoint site, folder, or document library URL
         </p>
         <p class="input__error" id="inputError" style="display: none;"></p>
+
+        <!-- Browse Mode Toggle -->
+        <div class="animate-fade-in stagger-7" style="margin-top: var(--space-4);">
+          <button class="btn btn--ghost" id="toggleBrowseBtn" style="font-size: var(--text-sm);">
+            📂 Or browse folders first
+          </button>
+        </div>
+
+        <!-- File Browser (hidden by default) -->
+        <div id="fileBrowserSection" style="display: none; width: 100%; max-width: 640px; margin-top: var(--space-6);">
+        </div>
 
         <!-- Recent Scans -->
         <div id="recentScans" class="animate-fade-in-up stagger-8" style="margin-top: var(--space-12); width: 100%; max-width: 640px; display: none;">
@@ -80,6 +91,7 @@
     import { initAuth, signIn, signOut, isSignedIn, getUserDisplay, onAuthChange } from './js/auth.js';
     import { startCrawl, getRecentScans } from './js/api.js';
     import { showToast } from './js/ui/toast.js';
+    import { createFileBrowser } from './js/ui/file-browser.js';
 
     const urlInput = document.getElementById('sharepointUrl');
     const goBtn = document.getElementById('goBtn');
@@ -88,6 +100,11 @@
     const headerRight = document.getElementById('headerRight');
     const recentScansSection = document.getElementById('recentScans');
     const recentScansList = document.getElementById('recentScansList');
+    const toggleBrowseBtn = document.getElementById('toggleBrowseBtn');
+    const fileBrowserSection = document.getElementById('fileBrowserSection');
+
+    let fileBrowser = null;
+    let browseMode = false;
 
     // SharePoint URL validation
     const SP_REGEX = /^https:\/\/[\w-]+\.sharepoint\.com\/(sites|teams)\/[\w%-]+/i;
@@ -219,6 +236,43 @@
     onAuthChange((user) => {
       renderHeaderAuth(user);
       loadRecentScans();
+    });
+
+    // Toggle browse mode
+    toggleBrowseBtn.addEventListener('click', () => {
+      browseMode = !browseMode;
+      if (browseMode) {
+        fileBrowserSection.style.display = 'block';
+        toggleBrowseBtn.textContent = '⬆️ Hide folder browser';
+        if (!fileBrowser) {
+          fileBrowser = createFileBrowser(fileBrowserSection, {
+            onSelectFolder: async ({ url, path, site }) => {
+              if (!isSignedIn()) {
+                sessionStorage.setItem('pending_sharepoint_url', url);
+                await signIn('/callback.html');
+                return;
+              }
+
+              // Start scan with folder path
+              goBtn.disabled = true;
+              goBtn.textContent = 'SCANNING...';
+              try {
+                const result = await startCrawl(url, path);
+                if (result.scan_id) {
+                  window.location.href = `dashboard.html?scan_id=${result.scan_id}`;
+                }
+              } catch (err) {
+                showToast(err.message, 'error');
+                goBtn.disabled = false;
+                goBtn.textContent = 'GO';
+              }
+            }
+          });
+        }
+      } else {
+        fileBrowserSection.style.display = 'none';
+        toggleBrowseBtn.textContent = '📂 Or browse folders first';
+      }
     });
 
     initAuth().then(() => {

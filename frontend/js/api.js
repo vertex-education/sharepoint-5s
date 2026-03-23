@@ -10,7 +10,7 @@ import { getSession as getCachedSession } from './auth.js';
  * Make an authenticated request to a Supabase Edge Function.
  * Uses supabase.functions.invoke() which handles auth automatically.
  */
-async function callEdgeFunction(name, { body = null } = {}) {
+export async function callEdgeFunction(name, body = null) {
   console.log(`[API] callEdgeFunction('${name}') entered`);
 
   // Use Supabase's built-in invoke which handles auth automatically
@@ -30,12 +30,15 @@ async function callEdgeFunction(name, { body = null } = {}) {
 /**
  * Start a SharePoint crawl.
  * @param {string} sharepointUrl - The SharePoint URL to crawl
+ * @param {string} [folderPath] - Optional folder path to start from
  * @returns {{ scan_id: string }}
  */
-export async function startCrawl(sharepointUrl) {
-  return callEdgeFunction('crawl-sharepoint', {
-    body: { sharepoint_url: sharepointUrl },
-  });
+export async function startCrawl(sharepointUrl, folderPath = null) {
+  const body = { sharepoint_url: sharepointUrl };
+  if (folderPath) {
+    body.folder_path = folderPath;
+  }
+  return callEdgeFunction('crawl-sharepoint', body);
 }
 
 /**
@@ -44,9 +47,7 @@ export async function startCrawl(sharepointUrl) {
  * @returns {{ status, crawl_progress, total_files, total_folders, total_size_bytes, error_message }}
  */
 export async function getCrawlStatus(scanId) {
-  return callEdgeFunction('crawl-status', {
-    body: { scan_id: scanId },
-  });
+  return callEdgeFunction('crawl-status', { scan_id: scanId });
 }
 
 /**
@@ -55,9 +56,7 @@ export async function getCrawlStatus(scanId) {
  * @returns {{ suggestion_count, categories }}
  */
 export async function startAnalysis(scanId) {
-  return callEdgeFunction('analyze', {
-    body: { scan_id: scanId },
-  });
+  return callEdgeFunction('analyze', { scan_id: scanId });
 }
 
 /**
@@ -66,9 +65,7 @@ export async function startAnalysis(scanId) {
  * @returns {{ results: Array<{ suggestion_id, status, error? }> }}
  */
 export async function executeActions(suggestionIds) {
-  return callEdgeFunction('execute-actions', {
-    body: { suggestion_ids: suggestionIds },
-  });
+  return callEdgeFunction('execute-actions', { suggestion_ids: suggestionIds });
 }
 
 /**
@@ -232,7 +229,7 @@ export async function getFileStats(scanId) {
  * @returns {{ leaderboard: Array, aggregates: object, current_user_id: string }}
  */
 export async function getLeaderboard() {
-  return callEdgeFunction('get-leaderboard', {});
+  return callEdgeFunction('get-leaderboard');
 }
 
 /**
@@ -240,7 +237,7 @@ export async function getLeaderboard() {
  * @returns {{ sites: Array, summary: object }}
  */
 export async function getMySites() {
-  return callEdgeFunction('get-my-sites', {});
+  return callEdgeFunction('get-my-sites');
 }
 
 /**
@@ -250,7 +247,5 @@ export async function getMySites() {
  * @returns {{ done, processed, remaining, status, total_files, total_folders, total_size_bytes, crawl_progress }}
  */
 export async function continueCrawl(scanId) {
-  return callEdgeFunction('continue-crawl', {
-    body: { scan_id: scanId },
-  });
+  return callEdgeFunction('continue-crawl', { scan_id: scanId });
 }
