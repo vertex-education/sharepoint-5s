@@ -10,6 +10,27 @@ import { createGraphClient } from '../_shared/graph-client.ts';
 
 const MIN_SIZE_BYTES = 1024 * 1024 * 1024; // 1GB default
 
+// Folders to skip - these are typically Teams channel folders or system folders
+const TEAMS_CHANNEL_PATTERNS = [
+  /^General$/i,
+  /^Private$/i,
+  /^Shared$/i,
+  /^Wiki$/i,
+  /^_private$/i,
+  /^Microsoft Teams Chat Files$/i,
+  /^Notebooks$/i,
+];
+
+// System folders to always skip
+const SYSTEM_FOLDERS = [
+  'Forms',
+  '_catalogs',
+  '_cts',
+  'SiteAssets',
+  'SitePages',
+  'Style Library',
+];
+
 serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCors(req);
@@ -57,14 +78,15 @@ serve(async (req) => {
       });
     }
 
-    // Find large folders
-    const folders = await findLargeFolders(graph, siteInfo.driveId, minSizeBytes);
+    // Find large folders (exclude Teams channel folders if Teams site)
+    const folders = await findLargeFolders(graph, siteInfo.driveId, minSizeBytes, siteInfo.isTeamsSite);
 
     return new Response(JSON.stringify({
       folders,
       siteInfo: {
         siteName: siteInfo.siteName,
         driveName: siteInfo.driveName,
+        isTeamsSite: siteInfo.isTeamsSite,
       }
     }), {
       headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
@@ -114,6 +136,11 @@ async function getSiteInfo(graph: any, parsed: any) {
     const siteId = siteResponse.id;
     const siteName = siteResponse.displayName;
 
+    // Check if this is a Teams site (connected to a Microsoft 365 Group)
+    const isTeamsSite = parsed.sitePath?.toLowerCase().includes('/teams/') ||
+      siteResponse.webTemplate === 'GROUP' ||
+      siteResponse.root?.webTemplate === 'GROUP#0';
+
     // Get drives
     const drivesResponse = await graph.api(`/sites/${siteId}/drives`).get();
     const drives = drivesResponse.value;
@@ -130,6 +157,7 @@ async function getSiteInfo(graph: any, parsed: any) {
       siteName,
       driveId: drive.id,
       driveName: drive.name,
+      isTeamsSite,
     };
   } catch (error) {
     console.error('Error getting site info:', error);
@@ -137,8 +165,26 @@ async function getSiteInfo(graph: any, parsed: any) {
   }
 }
 
-async function findLargeFolders(graph: any, driveId: string, minSizeBytes: number) {
+async function findLargeFolders(graph: any, driveId: string, minSizeBytes: number, isTeamsSite: boolean = false) {
   const largeFolders: any[] = [];
+
+  // Helper to check if a folder should be skipped
+  const shouldSkipFolder = (name: string, isRootLevel: boolean): boolean => {
+    // Always skip system folders
+    if (SYSTEM_FOLDERS.includes(name)) {
+      return true;
+    }
+
+    // For Teams sites, skip root-level channel folders
+    if (isTeamsSite && isRootLevel) {
+      if (TEAMS_CHANNEL_PATTERNS.some(pattern => pattern.test(name))) {
+        console.log(`Skipping Teams channel folder: ${name}`);
+        return true;
+      }
+    }
+
+    return false;
+  };
 
   // Get root children
   const rootResponse = await graph
@@ -150,6 +196,11 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
   // Check each folder
   for (const item of rootResponse.value) {
     if (item.folder) {
+      // Skip Teams channel folders and system folders
+      if (shouldSkipFolder(item.name, true)) {
+        continue;
+      }
+
       const folderSize = await getFolderSize(graph, driveId, item.id);
       if (folderSize >= minSizeBytes) {
         largeFolders.push({
@@ -170,6 +221,11 @@ async function findLargeFolders(graph: any, driveId: string, minSizeBytes: numbe
 
         for (const subItem of subResponse.value) {
           if (subItem.folder) {
+            // Skip system folders at any level
+            if (shouldSkipFolder(subItem.name, false)) {
+              continue;
+            }
+
             const subSize = await getFolderSize(graph, driveId, subItem.id);
             if (subSize >= minSizeBytes) {
               largeFolders.push({

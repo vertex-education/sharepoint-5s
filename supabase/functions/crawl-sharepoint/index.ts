@@ -16,6 +16,47 @@ import { graphFetch, graphFetchAllPages, parseSharePointUrl } from '../_shared/g
 // Keep this low to avoid Edge Function timeout (60s on free tier)
 const BATCH_SIZE = 15;
 
+// Folders to skip - these are typically Teams channel folders or system folders
+const TEAMS_CHANNEL_PATTERNS = [
+  /^General$/i,
+  /^Private$/i,
+  /^Shared$/i,
+  /^Wiki$/i,
+  /^_private$/i,
+  /^Microsoft Teams Chat Files$/i,
+  /^Notebooks$/i,
+];
+
+// System folders to always skip
+const SYSTEM_FOLDERS = [
+  'Forms',
+  '_catalogs',
+  '_cts',
+  'SiteAssets',
+  'SitePages',
+  'Style Library',
+];
+
+/**
+ * Check if a folder should be skipped (Teams channel or system folder).
+ */
+function shouldSkipFolder(name: string, depth: number, isTeamsSite: boolean): boolean {
+  // Always skip system folders
+  if (SYSTEM_FOLDERS.includes(name)) {
+    return true;
+  }
+
+  // For Teams sites, skip root-level channel folders (depth 0 or 1)
+  if (isTeamsSite && depth <= 1) {
+    if (TEAMS_CHANNEL_PATTERNS.some(pattern => pattern.test(name))) {
+      console.log(`Skipping Teams channel folder: ${name}`);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -90,7 +131,17 @@ async function initializeCrawl(
     const site = await graphFetch(userId, `/sites/${hostname}:${sitePath}`);
     const siteId = site.id;
 
-    await admin.from('scans').update({ site_id: siteId }).eq('id', scanId);
+    // Check if this is a Teams-connected site
+    const isTeamsSite = sitePath?.toLowerCase().includes('/teams/') ||
+      site.webTemplate === 'GROUP' ||
+      site.root?.webTemplate === 'GROUP#0';
+
+    console.log(`Site ${site.displayName} isTeamsSite: ${isTeamsSite}`);
+
+    await admin.from('scans').update({
+      site_id: siteId,
+      // Store Teams site flag in metadata for later use
+    }).eq('id', scanId);
 
     // 2. Get drives (document libraries) for the site
     const drivesData = await graphFetch(userId, `/sites/${siteId}/drives`);
@@ -140,6 +191,7 @@ async function initializeCrawl(
         depth: 0,
         folder_path: `/${drive.name}/`,
         status: 'pending',
+        is_teams_site: isTeamsSite,
       });
     }
 
@@ -313,6 +365,12 @@ async function processFolder(
       });
 
       if (isFolder) {
+        // Skip Teams channel folders and system folders
+        const isTeamsSite = queueItem.is_teams_site || false;
+        if (shouldSkipFolder(item.name, queueItem.depth + 1, isTeamsSite)) {
+          continue; // Skip this folder entirely
+        }
+
         foldersAdded++;
         newQueueItems.push({
           scan_id: scanId,
@@ -322,6 +380,7 @@ async function processFolder(
           depth: queueItem.depth + 1,
           folder_path: itemPath,
           status: 'pending',
+          is_teams_site: isTeamsSite,
         });
       } else {
         filesAdded++;
