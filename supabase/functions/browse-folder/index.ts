@@ -95,10 +95,16 @@ async function getSiteAndDrive(userId: string, hostname: string, sitePath: strin
 
 async function getFolderContents(userId: string, driveId: string, folderPath: string) {
   try {
-    const endpoint = folderPath
-      ? `/drives/${driveId}/root:/${encodeURIComponent(folderPath)}:/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`
-      : `/drives/${driveId}/root/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`;
+    let endpoint: string;
+    if (folderPath) {
+      // Encode each path segment separately, not the whole path
+      const encodedPath = folderPath.split('/').map(encodeURIComponent).join('/');
+      endpoint = `/drives/${driveId}/root:/${encodedPath}:/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`;
+    } else {
+      endpoint = `/drives/${driveId}/root/children?$select=id,name,size,folder,file,webUrl,lastModifiedDateTime&$orderby=name&$top=200`;
+    }
 
+    console.log('getFolderContents endpoint:', endpoint);
     const response = await graphFetch(userId, endpoint);
 
     return response.value.map((item: any) => ({

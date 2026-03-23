@@ -75,6 +75,8 @@ serve(async (req: Request) => {
     // Parse the URL
     const { hostname, sitePath, libraryPath } = parseSharePointUrl(sharepoint_url);
 
+    console.log('crawl-sharepoint input:', { sharepoint_url, folder_path, hostname, sitePath, libraryPath });
+
     const admin = getAdminClient();
 
     // Create a scan record - include folder_path in URL for display
@@ -183,7 +185,9 @@ async function initializeCrawl(
       if (folderPath) {
         const cleanPath = folderPath.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
         if (cleanPath) {
-          startPath = `/drives/${drive.id}/root:/${cleanPath}:`;
+          // URL-encode path segments for Graph API
+          const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+          startPath = `/drives/${drive.id}/root:/${encodedPath}:`;
           initialFolderPath = `/${drive.name}/${cleanPath}/`;
         }
       } else if (libraryPath && targetDrives.length === 1) {
@@ -191,12 +195,13 @@ async function initializeCrawl(
         const parts = decodeURIComponent(libraryPath).split('/').filter(Boolean);
         if (parts.length > 1) {
           const subPath = parts.slice(1).join('/');
-          startPath = `/drives/${drive.id}/root:/${subPath}:`;
+          const encodedSubPath = subPath.split('/').map(encodeURIComponent).join('/');
+          startPath = `/drives/${drive.id}/root:/${encodedSubPath}:`;
           initialFolderPath = `/${drive.name}/${subPath}/`;
         }
       }
 
-      console.log(`Queue seed: drive=${drive.name}, startPath=${startPath}, folderPath=${initialFolderPath}`);
+      console.log(`Queue seed: drive=${drive.name}, startPath=${startPath}, folderPath=${initialFolderPath}, graph_path=${startPath}/children`);
 
       queueItems.push({
         scan_id: scanId,
