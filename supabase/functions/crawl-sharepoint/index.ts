@@ -63,7 +63,7 @@ serve(async (req: Request) => {
 
   try {
     const { userId } = await verifyAuth(req);
-    const { sharepoint_url } = await req.json();
+    const { sharepoint_url, folder_path } = await req.json();
 
     if (!sharepoint_url) {
       return new Response(
@@ -77,12 +77,13 @@ serve(async (req: Request) => {
 
     const admin = getAdminClient();
 
-    // Create a scan record
+    // Create a scan record - include folder_path in URL for display
+    const displayUrl = folder_path ? `${sharepoint_url}/${folder_path}` : sharepoint_url;
     const { data: scan, error: scanError } = await admin
       .from('scans')
       .insert({
         user_id: userId,
-        sharepoint_url,
+        sharepoint_url: displayUrl,
         status: 'crawling',
       })
       .select()
@@ -91,7 +92,8 @@ serve(async (req: Request) => {
     if (scanError) throw scanError;
 
     // Initialize the crawl: resolve site, seed queue, and process first batch
-    const initPromise = initializeCrawl(admin, userId, scan.id, hostname, sitePath, libraryPath);
+    // Pass folder_path separately so it can be handled correctly
+    const initPromise = initializeCrawl(admin, userId, scan.id, hostname, sitePath, libraryPath, folder_path);
 
     // Use EdgeRuntime.waitUntil to continue processing after response is sent
     if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
@@ -124,7 +126,8 @@ async function initializeCrawl(
   scanId: string,
   hostname: string,
   sitePath: string,
-  libraryPath: string | null
+  libraryPath: string | null,
+  folderPath: string | null = null
 ) {
   try {
     // 1. Resolve the site ID
@@ -174,14 +177,26 @@ async function initializeCrawl(
 
     for (const drive of targetDrives) {
       let startPath = `/drives/${drive.id}/root`;
+      let initialFolderPath = `/${drive.name}/`;
 
-      if (libraryPath && targetDrives.length === 1) {
+      // If folderPath is provided (from file browser), use it directly as the path within the drive
+      if (folderPath) {
+        const cleanPath = folderPath.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+        if (cleanPath) {
+          startPath = `/drives/${drive.id}/root:/${cleanPath}:`;
+          initialFolderPath = `/${drive.name}/${cleanPath}/`;
+        }
+      } else if (libraryPath && targetDrives.length === 1) {
+        // libraryPath from URL includes library name, extract subpath
         const parts = decodeURIComponent(libraryPath).split('/').filter(Boolean);
         if (parts.length > 1) {
           const subPath = parts.slice(1).join('/');
           startPath = `/drives/${drive.id}/root:/${subPath}:`;
+          initialFolderPath = `/${drive.name}/${subPath}/`;
         }
       }
+
+      console.log(`Queue seed: drive=${drive.name}, startPath=${startPath}, folderPath=${initialFolderPath}`);
 
       queueItems.push({
         scan_id: scanId,
@@ -189,7 +204,7 @@ async function initializeCrawl(
         graph_path: `${startPath}/children`,
         parent_item_id: null,
         depth: 0,
-        folder_path: `/${drive.name}/`,
+        folder_path: initialFolderPath,
         status: 'pending',
         is_teams_site: isTeamsSite,
       });
